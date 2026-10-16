@@ -1,0 +1,7 @@
+.CF_TOKEN
+*.env
+db.sqlite3
+.idea/
+agent/binaries/
+*.pyc
+.air/

@@ -1,0 +1,6 @@
+title = "NovaUI Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# Add allowlists only after confirming that a finding is a false positive.

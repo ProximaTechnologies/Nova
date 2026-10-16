@@ -1,0 +1,19 @@
+# Local development files and generated output
+.DS_Store
+.idea/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+*.env
+!.env.example
+.CF_TOKEN
+*.sqlite3
+celerybeat-schedule*
+.coverage
+coverage.xml
+htmlcov/
+staticfiles/

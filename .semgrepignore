@@ -1,0 +1,6 @@
+.git/
+.venv/
+.pytest_cache/
+NovaUI/static/vendor/
+NovaUI/agent/binaries/
+NovaUI/db.sqlite3
