@@ -1,0 +1,22 @@
+.CF_TOKEN
+*.env
+.env*
+
+.git
+.github
+.idea
+.pytest_cache
+.venv
+__pycache__
+*.py[cod]
+
+Nova-Supervisor
+
+db.sqlite3
+*.sqlite3
+celerybeat-schedule
+staticfiles
+
+# Only supervisor-builder supplies release artifacts.
+agent/binaries/
+.DS_Store

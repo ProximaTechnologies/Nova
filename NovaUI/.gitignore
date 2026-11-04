@@ -5,3 +5,14 @@ db.sqlite3
 agent/binaries/
 *.pyc
 .air/
+.env
+.env.*
+!.env.example
+!.env.production.example
+.venv/
+__pycache__/
+.pytest_cache/
+staticfiles/
+celerybeat-schedule*
+*.sqlite3
+test-results.xml
