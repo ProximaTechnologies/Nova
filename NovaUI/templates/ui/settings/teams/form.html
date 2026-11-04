@@ -1,0 +1,49 @@
+{% extends 'ui/base.html' %}
+{% load static %}
+{% block content %}
+    <div class="nova-page-narrow">
+        <div class="nova-page-header">
+            <div>
+                <p class="text-sm font-semibold text-primary">Team member</p>
+                <h1 class="nova-page-title mt-2 text-3xl">{{ title }}</h1>
+            </div>
+            <a href="{% url 'settings_team' tenant_id_secure %}" class="btn btn-ghost">Back</a>
+        </div>
+
+        {% if form.errors.non_field_errors %}
+            <div class="alert alert-error mb-4">
+                <span>{{ form.errors.non_field_errors }}</span>
+            </div>
+        {% endif %}
+
+        <form method="post" class="nova-card space-y-4 bg-base-100 p-6">
+            {% csrf_token %}
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium">Email</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <label class="label"><span
+                            class="label-text-alt text-error">{{ form.email.errors|striptags }}</span></label>
+                {% endif %}
+            </div>
+
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium">Role</span>
+                </label>
+                {{ form.role }}
+                {% if form.role.errors %}
+                    <label class="label"><span class="label-text-alt text-error">{{ form.role.errors|striptags }}</span></label>
+                {% endif %}
+            </div>
+
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+                <button class="btn btn-primary" type="submit">{{ submit_label }}</button>
+                <a href="{% url 'settings_team' tenant_id_secure %}" class="btn btn-ghost">Cancel</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

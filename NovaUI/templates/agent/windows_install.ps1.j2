@@ -1,0 +1,148 @@
+<#
+.SYNOPSIS
+  Silent install of Grafana Alloy on Windows.
+
+.PARAMETERS
+  -Version       : Release tag like 'v1.10.2'. Defaults to 'latest'.
+  -ConfigUrl     : (Optional) HTTP/S URL to a config.alloy to place on disk.
+  -ConfigContent : (Optional) Inline config text. Ignored if -ConfigUrl is set.
+  -InstallDir    : (Optional) Install root. Defaults to $Env:ProgramFiles\GrafanaLabs\Alloy
+  -EnvVars       : (Optional) Hashtable of env vars for the Alloy service. e.g. @{ "ALLOY_DEPLOY_MODE"="windows" }
+  -ServiceUser   : (Optional) Run service as this account. Defaults to LocalSystem.
+  -ServicePass   : (Optional) Password for ServiceUser (not needed for LocalSystem).
+#>
+
+param(
+    [string]$Version = "latest",
+    [string]$ConfigUrl,
+    [string]$ConfigContent,
+    [string]$InstallDir = "$Env:ProgramFiles\GrafanaLabs\Alloy",
+    [hashtable]$EnvVars = @{ },
+    [string]$ServiceUser,
+    [string]$ServicePass
+)
+
+# --- Safety checks
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
+{
+    Write-Error "Please run this script in an elevated PowerShell (Run as Administrator)."
+    exit 1
+}
+
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
+
+# --- Resolve release + asset
+$apiUrl = if ($Version -eq "latest")
+{
+    "https://api.github.com/repos/grafana/alloy/releases/latest"
+}
+else
+{
+    "https://api.github.com/repos/grafana/alloy/releases/tags/$Version"
+}
+
+Write-Host "Fetching release metadata: $apiUrl"
+$release = Invoke-RestMethod -UseBasicParsing -Uri $apiUrl
+$asset = $release.assets | Where-Object { $_.name -eq "alloy-installer-windows-amd64.exe.zip" } | Select-Object -First 1
+if (-not $asset)
+{
+    throw "Could not find 'alloy-installer-windows-amd64.exe.zip' in release '$Version'."
+}
+
+# --- Download & extract installer
+$temp = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ("alloy-install-" + [guid]::NewGuid())) -Force
+$zipPath = Join-Path $temp "alloy-installer-windows-amd64.exe.zip"
+$exePath = Join-Path $temp "alloy-installer-windows-amd64.exe"
+
+Write-Host "Downloading installer..."
+Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $zipPath
+Expand-Archive -Path $zipPath -DestinationPath $temp -Force
+if (-not (Test-Path $exePath))
+{
+    throw "Installer EXE not found after extraction."
+}
+
+# --- Prepare configuration
+$configPath = Join-Path $InstallDir "config.alloy"
+if ($ConfigUrl)
+{
+    Write-Host "Fetching config from $ConfigUrl"
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    Invoke-WebRequest -UseBasicParsing -Uri $ConfigUrl -OutFile $configPath
+}
+elseif ($ConfigContent)
+{
+    Write-Host "Writing inline config to $configPath"
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    Set-Content -Path $configPath -Value $ConfigContent -NoNewline -Encoding UTF8
+}
+
+# --- Build /ENVIRONMENT string (null-separated KEY=VALUE pairs)
+function Join-NullSeparated([string[]]$items)
+{
+    # PowerShell can't embed literal NUL in a regular string argument easily, but the installer expects \0 in the switch text.
+    return ($items -join '\0')
+}
+$envList = @()
+$EnvVars.GetEnumerator() | ForEach-Object { $envList += ("{0}={1}" -f $_.Key, $_.Value) }
+$envSwitch = if ($envList.Count -gt 0)
+{
+    "/ENVIRONMENT=""$( Join-NullSeparated $envList )"""
+}
+else
+{
+    ""
+}
+
+# --- Build service account switches (optional)
+$acctSwitches = @()
+if ($ServiceUser)
+{
+    $acctSwitches += "/USERNAME=""$ServiceUser"""
+}
+if ($ServicePass)
+{
+    $acctSwitches += "/PASSWORD=""$ServicePass"""
+}
+$acctSwitch = ($acctSwitches -join " ")
+
+# --- Run silent installer
+# Supported switches: /S, /CONFIG=, /ENVIRONMENT=, /USERNAME=, /PASSWORD=, /DISABLEREPORTING=, etc.
+# Docs: https://grafana.com/docs/alloy/latest/set-up/install/windows/
+$cfgSwitch = if (Test-Path $configPath)
+{
+    "/CONFIG=""$configPath"""
+}
+else
+{
+    ""
+}
+
+$cmd = "$exePath /S $cfgSwitch $envSwitch $acctSwitch"
+Write-Host "Running installer: $cmd"
+Start-Process -FilePath $exePath -ArgumentList @("/S", $cfgSwitch, $envSwitch, $acctSwitch) -Wait
+
+# --- Verify service
+Start-Sleep -Seconds 2
+$svc = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
+if (-not $svc)
+{
+    throw "Alloy service not found. Installation may have failed."
+}
+
+if ($svc.Status -ne 'Running')
+{
+    Write-Host "Starting Alloy service..."
+    Start-Service -Name "Alloy"
+    $svc.WaitForStatus('Running', '00:00:15')
+}
+Write-Host "Alloy service status: $( (Get-Service Alloy).Status )"
+
+# --- Show where things landed
+Write-Host "Installed to: $InstallDir"
+if (Test-Path $configPath)
+{
+    Write-Host "Config: $configPath"
+}
+Write-Host "Done."

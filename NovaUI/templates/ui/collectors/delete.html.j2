@@ -1,0 +1,18 @@
+{% extends "ui/base.html" %}
+{% block content %}
+    <div class="nova-page-narrow">
+        <div class="mb-5">
+            <p class="text-sm font-semibold text-error">Confirm deletion</p>
+            <h1 class="nova-page-title mt-2 text-3xl">Delete collector</h1>
+        </div>
+        <div class="nova-card bg-base-100 p-6">
+        <p>Delete <b>{{ object.node_name }}</b>?</p>
+        <p class="nova-muted mt-2 text-sm">Collector ID: <code class="rounded bg-base-200 px-2 py-1">{{ object.node_id }}</code></p>
+        <form method="post" class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+            {% csrf_token %}
+            <button class="btn btn-error" type="submit">Delete</button>
+            <a class="btn btn-ghost" href="{% url 'list_collectors' tenant_id_secure %}">Cancel</a>
+        </form>
+        </div>
+    </div>
+{% endblock %}

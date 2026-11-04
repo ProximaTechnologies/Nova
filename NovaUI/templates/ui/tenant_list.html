@@ -1,0 +1,28 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+    <div class="nova-page-narrow">
+        <div class="mb-6">
+            <p class="text-sm font-semibold text-primary">Workspace access</p>
+            <h1 class="nova-page-title mt-2 text-3xl sm:text-4xl">Choose your tenant</h1>
+            <p class="nova-muted mt-3 text-sm">Select the workspace you want to manage.</p>
+        </div>
+
+        <div class="nova-panel divide-y divide-base-300/70 overflow-hidden">
+            {% for tenant in tenants %}
+                <a
+                        href="{% url 'dashboard' tenant.random_prefix|add:'-'|add:tenant.name %}"
+                        class="group flex items-center justify-between gap-4 p-4 transition hover:bg-primary/10"
+                >
+                    <span class="font-semibold">{{ tenant.name }}</span>
+                    <span class="text-sm font-semibold text-primary transition group-hover:translate-x-1">Open</span>
+                </a>
+            {% empty %}
+                <div class="p-8 text-center">
+                    <p class="font-semibold">No tenants available</p>
+                    <p class="nova-muted mt-1 text-sm">Ask an administrator to add you to a tenant.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

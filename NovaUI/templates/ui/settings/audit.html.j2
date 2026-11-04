@@ -1,0 +1,71 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+    <div class="nova-page space-y-6">
+        <div>
+            <p class="text-sm font-semibold text-primary">Security trail</p>
+            <h1 class="nova-page-title mt-2 text-3xl">Audit log</h1>
+            <p class="nova-muted mt-2 text-sm">{{ tenant.name }}</p>
+        </div>
+
+        <div class="nova-panel overflow-x-auto">
+            <table class="table table-zebra">
+                <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Object</th>
+                    <th>Changes</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td class="whitespace-nowrap text-sm">{{ entry.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td class="text-sm">
+                            {% if entry.actor %}
+                                {{ entry.actor.email|default:entry.actor.get_username }}
+                            {% elif entry.actor_email %}
+                                {{ entry.actor_email }}
+                            {% else %}
+                                System
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-outline">{{ entry.get_action_display|title }}</span>
+                        </td>
+                        <td class="min-w-56">
+                            <div class="font-medium">{{ entry.content_type.app_label }}.{{ entry.content_type.model }}</div>
+                            <div class="text-xs text-base-content/70">{{ entry.object_repr }}</div>
+                        </td>
+                        <td class="min-w-96 text-sm">
+                            {% if entry.changes_display_dict %}
+                                <ul class="space-y-1">
+                                    {% for field, values in entry.changes_display_dict.items %}
+                                        <li>
+                                            <span class="font-medium">{{ field }}</span>:
+                                            <span class="text-base-content/70">{{ values.0|default:"-" }}</span>
+                                            <span class="text-base-content/40">-&gt;</span>
+                                            <span>{{ values.1|default:"-" }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-base-content/50">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="py-10 text-center">
+                            <p class="font-semibold">No audit entries yet</p>
+                            <p class="nova-muted mt-1 text-sm">Tenant activity will appear here.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

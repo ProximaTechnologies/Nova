@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+echo "Installing Nova Agent"
+
+# ================== User-tunable defaults ==================
+ALLOY_VERSION="v1.10.2"           # Override with --version vX.Y.Z
+SERVICE_NAME="alloy"              # Override with --service-name NAME
+CONFIG_PATH="/etc/alloy/config.alloy"
+HTTP_TIMEOUT=45
+INSECURE_TLS="${NOVA_INSECURE_TLS:-{{ insecure_tls_default }}}" # Set to 1 or pass --insecure for self-signed Nova endpoints.
+SUPERVISOR_VERSION="${NOVA_SUPERVISOR_VERSION:-{{ supervisor_version }}}"
+SUPERVISOR_URL="${NOVA_SUPERVISOR_BINARY_URL:-{{ supervisor_binary_url }}}"
+SUPERVISOR_SHA256="${NOVA_SUPERVISOR_BINARY_SHA256:-{{ supervisor_binary_sha256 }}}"
+SUPERVISOR_SERVICE_NAME="nova-supervisor"
+SUPERVISOR_BIN="/usr/local/bin/nova-supervisor"
+SUPERVISOR_STATE_DIR="/var/lib/nova-supervisor"
+INSTALL_SUPERVISOR=1
+# ===========================================================
+
+NODE_ID="{{ node.node_id|cut:"-" }}"
+VERSION_REPORT_BASE_URL="{{ ui_url }}"
+VERSION_REPORT_USERNAME="{{ username }}"
+VERSION_REPORT_PASSWORD="{{ password }}"
+if [[ -z "$SUPERVISOR_URL" ]]; then
+  SUPERVISOR_URL="${VERSION_REPORT_BASE_URL%/}/agent/supervisor/binary/{version}/{arch}"
+fi
+
+# ============ EMBEDDED CONFIG (YOURS) ======================
+CONFIG_EMBEDDED="$(cat <<'__BEGIN_CONFIG__'
+remotecfg {
+    url = "{{ config_url }}"
+    basic_auth {
+        username      = "{{ username }}"
+        password      = "{{password}}"
+    }
+
+    id             = "{{ node.node_id|cut:"-" }}"
+    attributes     = {"tenant_id" = "{{ tenant.name }}"}
+    poll_frequency = "10s"
+}
+__BEGIN_CONFIG__
+)"
+# ===========================================================
+
+normalize_alloy_version(){
+  local version="${1:-}"
+  if [[ -z "$version" || "$version" =~ ^v || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\+[0-9A-Za-z.-]+)?$ ]]; then
+    printf "%s" "$version"
+  else
+    printf "v%s" "$version"
+  fi
+}
+
+START_AFTER_INSTALL=1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version) ALLOY_VERSION="${2:-}"; shift 2;;
+    --service-name) SERVICE_NAME="${2:-}"; shift 2;;
+    --supervisor-url) SUPERVISOR_URL="${2:-}"; shift 2;;
+    --supervisor-sha256) SUPERVISOR_SHA256="${2:-}"; shift 2;;
+    --no-supervisor) INSTALL_SUPERVISOR=0; shift;;
+    --insecure|--no-tls-verify) INSECURE_TLS=1; shift;;
+    --no-start) START_AFTER_INSTALL=0; shift;;
+    -h|--help) echo "Flags: --version vX.Y.Z  --service-name NAME  --supervisor-url URL  --supervisor-sha256 SHA256  --no-supervisor  --insecure  --no-start"; exit 0;;
+    *) echo "Unknown arg: $1 (valid: --version, --service-name, --supervisor-url, --supervisor-sha256, --no-supervisor, --insecure, --no-start)" >&2; exit 2;;
+  esac
+done
+ALLOY_VERSION="$(normalize_alloy_version "$ALLOY_VERSION")"
+
+log(){ printf "\033[1;32m[+] %s\033[0m\n" "$*"; }
+warn(){ printf "\033[1;33m[!] %s\033[0m\n" "$*" >&2; }
+err(){ printf "\033[1;31m[✗] %s\033[0m\n" "$*" >&2; exit 1; }
+need(){ command -v "$1" >/dev/null 2>&1 || err "Missing command: $1"; }
+report_alloy_version(){
+  local base_url="${VERSION_REPORT_BASE_URL%/}"
+  local version_report_url="${base_url}/agent/version/${NODE_ID}/${ALLOY_VERSION}"
+  local curl_tls_opts=()
+
+  if [[ -z "$base_url" ]]; then
+    warn "Skipping Alloy version report: UI URL is not configured."
+    return
+  fi
+  if [[ "$INSECURE_TLS" == "1" ]]; then
+    curl_tls_opts+=(--insecure)
+    warn "Using insecure TLS for Nova version report."
+  fi
+
+  log "Reporting Alloy version ${ALLOY_VERSION} to Nova..."
+  if curl -fsS "${curl_tls_opts[@]}" --retry 3 --retry-delay 2 --max-time "$HTTP_TIMEOUT" \
+      -u "${VERSION_REPORT_USERNAME}:${VERSION_REPORT_PASSWORD}" \
+      -X POST "$version_report_url" >/dev/null; then
+    log "Reported Alloy version to Nova."
+  else
+    warn "Could not report Alloy version to Nova. Installation completed, but node metadata may not show the version yet."
+  fi
+}
+install_supervisor(){
+  if [[ "$INSTALL_SUPERVISOR" -ne 1 ]]; then
+    warn "Skipping Nova Supervisor install."
+    return
+  fi
+  if [[ -z "$SUPERVISOR_URL" ]]; then
+    warn "Skipping Nova Supervisor install: NOVA_SUPERVISOR_BINARY_URL is not configured."
+    return
+  fi
+
+  local supervisor_url="${SUPERVISOR_URL//\{version\}/${SUPERVISOR_VERSION}}"
+  supervisor_url="${supervisor_url//\{arch\}/${KARCH}}"
+  local supervisor_tmp="${TMP}/nova-supervisor"
+  local curl_tls_opts=()
+
+  if [[ "$INSECURE_TLS" == "1" ]]; then
+    curl_tls_opts+=(--insecure)
+  fi
+
+  log "Downloading Nova Supervisor from ${supervisor_url}"
+  curl -fL "${curl_tls_opts[@]}" --retry 3 --retry-delay 2 --max-time "$HTTP_TIMEOUT" -o "$supervisor_tmp" "$supervisor_url"
+
+  [[ -n "$SUPERVISOR_SHA256" ]] || err "NOVA_SUPERVISOR_BINARY_SHA256 is required"
+  need sha256sum
+  printf "%s  %s\n" "$SUPERVISOR_SHA256" "$supervisor_tmp" | sha256sum -c - || err "Nova Supervisor checksum mismatch"
+
+  install -d -m 0755 "$(dirname "$SUPERVISOR_BIN")"
+  install -m 0755 "$supervisor_tmp" "$SUPERVISOR_BIN"
+  install -d -m 0700 "$SUPERVISOR_STATE_DIR"
+
+  log "Enrolling Nova Supervisor with NovaUI..."
+  "$SUPERVISOR_BIN" bootstrap \
+    -nova-ui-url "$VERSION_REPORT_BASE_URL" \
+    -node-id "$NODE_ID" \
+    -username "$VERSION_REPORT_USERNAME" \
+    -password "$VERSION_REPORT_PASSWORD" \
+    -alloy-service "$SERVICE_NAME" \
+    -state-path "${SUPERVISOR_STATE_DIR}/state.json"
+
+  cat > "/etc/systemd/system/${SUPERVISOR_SERVICE_NAME}.service" <<__BEGIN_SUPERVISOR_UNIT__
+[Unit]
+Description=Nova Supervisor
+After=network-online.target ${SERVICE_NAME}.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${SUPERVISOR_BIN}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+__BEGIN_SUPERVISOR_UNIT__
+}
+
+need curl
+need uname
+
+# --- Arch detect ---
+case "$(uname -m)" in
+  x86_64|amd64)    KARCH="amd64" ;;
+  aarch64|arm64)   KARCH="arm64" ;;
+  ppc64le|ppc64el) KARCH="ppc64le" ;;
+  s390x)           KARCH="s390x" ;;
+  *) err "Unsupported arch: $(uname -m) (supported: amd64, arm64, ppc64le, s390x)";;
+esac
+
+if [[ -z "$SUPERVISOR_SHA256" ]]; then
+  case "$KARC{% if supervisor_binary_sha256s %}
+{% for binary in supervisor_binary_sha256s %}
+    {{ binary.arch }}) SUPERVISOR_SHA256="{{ binary.sha256 }}" ;;{% endfor %}
+{% else %}
+    # NOVA_SUPERVISOR_BINARY_SHA256 set directly - use that for all architectures
+    amd64|arm64|ppc64le|s390x) SUPERVISOR_SHA256="{{ supervisor_binary_sha256 }}" ;;
+{% endif %}
+    *) ;;
+  esac
+fi
+
+# --- Distro detect (.deb vs .rpm) ---
+PKG_FMT=""
+if [[ -f /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  case "${ID_LIKE:-$ID}" in
+    *debian*|*ubuntu*) PKG_FMT="deb" ;;
+    *rhel*|*fedora*|*centos*|*rocky*|*alma*|*suse*|*amzn*|*amazon*) PKG_FMT="rpm" ;;
+  esac
+fi
+[[ -z "$PKG_FMT" ]] && err "Unsupported distro (need deb or rpm family)."
+
+# Map to release package arch names
+if [[ "$PKG_FMT" == "deb" ]]; then
+  case "$KARCH" in
+    amd64)   PKG_ARCH="amd64" ;;
+    arm64)   PKG_ARCH="arm64" ;;
+    ppc64le) PKG_ARCH="ppc64el" ;;
+    s390x)   err "s390x .deb not provided by Alloy releases (use rpm distro)." ;;
+  esac
+else
+  case "$KARCH" in
+    amd64)   PKG_ARCH="x86_64" ;;
+    arm64)   PKG_ARCH="aarch64" ;;
+    ppc64le) PKG_ARCH="ppc64le" ;;
+    s390x)   PKG_ARCH="s390x" ;;
+  esac
+fi
+
+log "Installing Grafana Alloy ${ALLOY_VERSION} (${PKG_FMT}, ${PKG_ARCH})"
+
+# --- Construct download URL ---
+VER_NUM="${ALLOY_VERSION#v}"   # strip leading "v"
+BASE_URL="https://github.com/grafana/alloy/releases/download/${ALLOY_VERSION}"
+PKG_NAME="alloy-${VER_NUM}-1.${PKG_ARCH}.${PKG_FMT}"
+DL_URL="${BASE_URL}/${PKG_NAME}"
+
+SHA_URL_CANDIDATES=(
+  "${BASE_URL}/SHA256SUMS"
+  "${BASE_URL}/sha256sums.txt"
+  "${BASE_URL}/alloy-${VER_NUM}-1.sha256sums.txt"
+)
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+PKG="$TMP/${PKG_NAME}"
+
+log "Downloading: $DL_URL"
+curl -fL --retry 3 --retry-delay 2 --max-time "$HTTP_TIMEOUT" -o "$PKG" "$DL_URL"
+
+# --- Best-effort checksum verify ---
+if command -v sha256sum >/dev/null 2>&1; then
+  for su in "${SHA_URL_CANDIDATES[@]}"; do
+    if curl -fsSL --max-time "$HTTP_TIMEOUT" -o "$TMP/sha256sums.txt" "$su"; then
+      if grep -q " ${PKG_NAME}\$" "$TMP/sha256sums.txt"; then
+        log "Verifying checksum…"
+        ( cd "$TMP" && grep " ${PKG_NAME}\$" sha256sums.txt | sha256sum -c - ) || err "Checksum mismatch"
+        break
+      fi
+    fi
+  done
+fi
+
+# --- Install package ---
+if [[ "$PKG_FMT" == "deb" ]]; then
+  need dpkg
+  log "Installing via dpkg…"
+  if ! dpkg -i "$PKG"; then
+    log "Fixing deps with apt…"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -f -y
+    dpkg -i "$PKG" || err "dpkg install still failing after deps fix"
+  fi
+else
+  need rpm
+  log "Installing via rpm/dnf/yum…"
+  if command -v dnf >/dev/null 2>&1; then
+    dnf -y install "$PKG"
+  elif command -v yum >/dev/null 2>&1; then
+    yum -y localinstall "$PKG"
+  else
+    rpm -Uvh --nodeps "$PKG" || warn "Installed with rpm --nodeps (ensure deps present)"
+  fi
+fi
+
+# --- Write config (owned by alloy) ---
+install -d -m 0755 /etc/alloy
+TMP_CFG="$(mktemp)"
+printf "%s\n" "$CONFIG_EMBEDDED" > "$TMP_CFG"
+rm -f "$CONFIG_PATH"
+mv "$TMP_CFG" "$CONFIG_PATH"
+chown alloy:alloy "$CONFIG_PATH"
+chmod 0640 "$CONFIG_PATH"
+
+install_supervisor
+report_alloy_version
+
+# --- Enable/Restart service (optional) ---
+if [[ "$START_AFTER_INSTALL" -eq 1 ]]; then
+  systemctl daemon-reload || true
+  log "Enabling and restarting ${SERVICE_NAME}.service…"
+  systemctl enable "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
+  systemctl restart "${SERVICE_NAME}.service"
+  if [[ "$INSTALL_SUPERVISOR" -eq 1 && -n "$SUPERVISOR_URL" ]]; then
+    log "Enabling and restarting ${SUPERVISOR_SERVICE_NAME}.service…"
+    systemctl enable "${SUPERVISOR_SERVICE_NAME}.service" >/dev/null 2>&1 || true
+    systemctl restart "${SUPERVISOR_SERVICE_NAME}.service"
+  fi
+  sleep 1
+  systemctl --no-pager --full status "${SERVICE_NAME}.service" || true
+  if [[ "$INSTALL_SUPERVISOR" -eq 1 && -n "$SUPERVISOR_URL" ]]; then
+    systemctl --no-pager --full status "${SUPERVISOR_SERVICE_NAME}.service" || true
+  fi
+else
+  log "Installation complete (skipped service start)."
+fi
+
+log "Wrote fresh config to ${CONFIG_PATH}"
+log "Done ✅"

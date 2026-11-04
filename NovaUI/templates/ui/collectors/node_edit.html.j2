@@ -1,0 +1,286 @@
+{% extends "ui/base.html" %}
+{% load widget_tweaks %}
+
+{% block content %}
+    <div class="nova-page space-y-6">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="space-y-2">
+                <div class="breadcrumbs text-sm">
+                    <ul>
+                        <li><a href="{{ collector_list_url }}">Collectors</a></li>
+                        <li>Edit</li>
+                    </ul>
+                </div>
+                <div class="space-y-1">
+                    <h1 class="nova-page-title text-3xl">{{ node.node_name }}</h1>
+                    <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
+                        <span class="badge min-w-max whitespace-nowrap px-3 {{ node.connection_badge_class }}">{{ node.connection_status_label }}</span>
+                        <code class="rounded bg-base-200 px-2 py-1 text-xs">{{ node.node_id }}</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'run_script_collector' tenant_id_secure node.node_id %}" class="btn btn-outline btn-sm">
+                    Install command
+                </a>
+                <a href="{{ collector_list_url }}" class="btn btn-ghost btn-sm">Back</a>
+            </div>
+        </div>
+
+        <form method="post" class="grid gap-6 lg:grid-cols-3">
+            {% csrf_token %}
+
+            <div class="space-y-6 lg:col-span-2">
+                <section class="nova-card bg-base-100 p-5">
+                    <div class="mb-5 flex flex-col gap-1">
+                        <h2 class="text-base font-semibold">General</h2>
+                        <p class="text-sm text-base-content/60">Identity and collector availability.</p>
+                    </div>
+
+                    {% if node_form.non_field_errors %}
+                        <div class="alert alert-error mb-4">
+                            <span>{{ node_form.non_field_errors }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <label class="form-control">
+                            <span class="label">
+                                <span class="label-text font-medium">Collector name</span>
+                            </span>
+                            {{ node_form.node_name|add_class:"input input-bordered w-full" }}
+                            {% if node_form.node_name.errors %}
+                                <span class="mt-2 text-sm text-error">{{ node_form.node_name.errors }}</span>
+                            {% endif %}
+                        </label>
+
+                        <div class="rounded-xl border border-base-300/80 bg-base-200/35 p-4">
+                            <div class="flex items-center justify-between gap-4">
+                                <div>
+                                    <div class="font-medium">Enabled</div>
+                                    <div class="text-sm text-base-content/60">
+                                        {{ node.enabled|yesno:"Collector can poll config,Collector cannot poll config" }}
+                                    </div>
+                                </div>
+                                {{ node_form.enabled|add_class:"toggle toggle-primary" }}
+                            </div>
+                            {% if node_form.enabled.errors %}
+                                <div class="mt-2 text-sm text-error">{{ node_form.enabled.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="nova-card bg-base-100 p-5">
+                    <div class="mb-5 flex flex-col gap-1">
+                        <h2 class="text-base font-semibold">Linux Collection</h2>
+                        <p class="text-sm text-base-content/60">Choose at least one signal for this collector.</p>
+                    </div>
+
+                    {% if features_form.non_field_errors %}
+                        <div class="alert alert-error mb-4">
+                            <span>{{ features_form.non_field_errors }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="space-y-3">
+                            <h3 class="text-sm font-semibold uppercase text-base-content/60">Metrics</h3>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                                <span>
+                                    <span class="block font-medium">Linux system metrics</span>
+                                    <span class="block text-sm text-base-content/60">CPU, memory, disk, and host health.</span>
+                                </span>
+                                {{ features_form.linuxMonitor }}
+                            </label>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                                <span>
+                                    <span class="block font-medium">Container metrics</span>
+                                    <span class="block text-sm text-base-content/60">Runtime and container resource usage.</span>
+                                </span>
+                                {{ features_form.containerMonitor }}
+                            </label>
+                        </div>
+
+                        <div class="space-y-3">
+                            <h3 class="text-sm font-semibold uppercase text-base-content/60">Logs</h3>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                                <span>
+                                    <span class="block font-medium">systemd journal</span>
+                                    <span class="block text-sm text-base-content/60">Service and host journal entries.</span>
+                                </span>
+                                {{ features_form.journalLog }}
+                            </label>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                                <span>
+                                    <span class="block font-medium">Docker logs</span>
+                                    <span class="block text-sm text-base-content/60">Container stdout and stderr streams.</span>
+                                </span>
+                                {{ features_form.dockerLogs }}
+                            </label>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                                <span>
+                                    <span class="block font-medium">File/path logs</span>
+                                    <span class="block text-sm text-base-content/60">Configured files and application paths.</span>
+                                </span>
+                                {{ features_form.fileMonitor }}
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="nova-card bg-base-100 p-5">
+                    <div class="mb-5 flex flex-col gap-1">
+                        <h2 class="text-base font-semibold">File Monitors</h2>
+                        <p class="text-sm text-base-content/60">Configured file paths for File/path logs. This plan
+                            allows {{ file_monitor_limit }} path{{ file_monitor_limit|pluralize }} per collector.</p>
+                    </div>
+
+                    {{ file_monitor_formset.management_form }}
+                    {% if file_monitor_formset.non_form_errors %}
+                        <div class="alert alert-error mb-4">
+                            <span>{{ file_monitor_formset.non_form_errors }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="grid gap-3">
+                        {% for form in file_monitor_formset %}
+                            <div class="rounded-xl border border-base-300/80 bg-base-200/30 p-4">
+                                {{ form.id }}
+                                <div class="grid gap-3 md:grid-cols-[1fr_2fr_auto_auto] md:items-start">
+                                    <label class="form-control">
+                                        <span class="label-text">Label</span>
+                                        {{ form.label }}
+                                        {% if form.label.errors %}
+                                            <span class="mt-1 text-sm text-error">{{ form.label.errors }}</span>
+                                        {% endif %}
+                                    </label>
+                                    <label class="form-control">
+                                        <span class="label-text">Absolute path</span>
+                                        {{ form.file_path }}
+                                        {% if form.file_path.errors %}
+                                            <span class="mt-1 text-sm text-error">{{ form.file_path.errors }}</span>
+                                        {% endif %}
+                                    </label>
+                                    <label class="form-control min-w-24">
+                                        <span class="label-text">Enabled</span>
+                                        <span class="pt-3">{{ form.enabled }}</span>
+                                    </label>
+                                    <label class="form-control min-w-24">
+                                        <span class="label-text">Delete</span>
+                                        <span class="pt-3">{{ form.DELETE|add_class:"checkbox checkbox-error" }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <a href="{{ collector_list_url }}" class="btn btn-ghost">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+            </div>
+
+            <aside class="space-y-4">
+                <section class="nova-card bg-base-100 p-5">
+                    <h2 class="mb-4 text-base font-semibold">Collector Details</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div>
+                            <dt class="text-base-content/60">Tenant</dt>
+                            <dd class="font-medium">{{ node.tenant.name }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-base-content/60">Alloy version</dt>
+                            <dd class="font-medium">{{ node.alloy_version|default:"Not reported" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-base-content/60">Supervisor version</dt>
+                            <dd class="font-medium">{{ node.supervisor_version|default:"Not reported" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-base-content/60">Platform</dt>
+                            <dd class="font-medium">
+                                {% if node.supervisor_arch or node.alloy_package_format %}
+                                    {{ node.supervisor_arch|default:"unknown" }}{% if node.alloy_package_format %}.{{ node.alloy_package_format }}{% endif %}
+                                {% else %}
+                                    Not reported
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-base-content/60">Last contact</dt>
+                            <dd class="font-medium">{{ node.last_contact_at|default:"Never" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-base-content/60">Updated</dt>
+                            <dd class="font-medium">{{ node.updated_at }}</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="nova-card bg-base-100 p-5">
+                    <h2 class="mb-4 text-base font-semibold">Manual Updates</h2>
+                    <p class="nova-muted mb-4 text-sm">
+                        Select a newer target version for the collector to pick up on its next config poll. Downgrades are not available from this page.
+                    </p>
+
+                    {% if update_form.non_field_errors %}
+                        <div class="alert alert-error mb-4">
+                            <span>{{ update_form.non_field_errors }}</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="space-y-4">
+                        <label class="form-control">
+                            <span class="label">
+                                <span class="label-text font-medium">Supervisor target</span>
+                            </span>
+                            {{ update_form.target_supervisor_version }}
+                            <span class="mt-2 text-xs text-base-content/60">
+                                Current: {{ node.supervisor_version|default:"Not reported" }}. {{ update_form.target_supervisor_version.help_text }}
+                            </span>
+                            {% if update_form.target_supervisor_version.errors %}
+                                <span class="mt-2 text-sm text-error">{{ update_form.target_supervisor_version.errors }}</span>
+                            {% endif %}
+                        </label>
+                        <label class="form-control">
+                            <span class="label">
+                                <span class="label-text font-medium">Alloy target</span>
+                            </span>
+                            {{ update_form.target_alloy_version }}
+                            <span class="mt-2 text-xs text-base-content/60">
+                                Current: {{ node.alloy_version|default:"Not reported" }}. {{ update_form.target_alloy_version.help_text }}
+                            </span>
+                            {% if update_form.target_alloy_version.errors %}
+                                <span class="mt-2 text-sm text-error">{{ update_form.target_alloy_version.errors }}</span>
+                            {% endif %}
+                        </label>
+                    </div>
+                </section>
+
+                <section class="nova-card bg-base-100 p-5">
+                    <h2 class="mb-4 text-base font-semibold">Active Signals</h2>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="badge {% if features.linuxMonitor %}badge-primary{% else %}badge-outline{% endif %}">
+                            Linux metrics
+                        </span>
+                        <span class="badge {% if features.containerMonitor %}badge-primary{% else %}badge-outline{% endif %}">
+                            Container metrics
+                        </span>
+                        <span class="badge {% if features.journalLog %}badge-primary{% else %}badge-outline{% endif %}">
+                            Journal logs
+                        </span>
+                        <span class="badge {% if features.dockerLogs %}badge-primary{% else %}badge-outline{% endif %}">
+                            Docker logs
+                        </span>
+                        <span class="badge {% if features.fileMonitor %}badge-primary{% else %}badge-outline{% endif %}">
+                            File logs
+                        </span>
+                    </div>
+                </section>
+            </aside>
+        </form>
+    </div>
+{% endblock %}

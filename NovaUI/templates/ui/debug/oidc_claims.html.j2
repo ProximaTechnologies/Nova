@@ -1,0 +1,61 @@
+{% extends "ui/base.html" %}
+{% block content %}
+    <div class="nova-page space-y-6">
+        <div>
+            <p class="text-sm font-semibold text-primary">Debug</p>
+            <h1 class="nova-page-title mt-2 text-3xl">OIDC claims</h1>
+            <p class="nova-muted mt-2 text-sm">{{ tenant.name }} / Grafana org {{ grafana_org_id|default:"-" }}</p>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+            <div class="nova-card bg-base-100">
+                <div class="card-body">
+                    <h2 class="card-title">Current user</h2>
+                    <dl class="grid gap-2 text-sm">
+                        <div class="flex justify-between gap-4">
+                            <dt>Email</dt>
+                            <dd class="font-medium">{{ claims.email|default:"-" }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <dt>Name</dt>
+                            <dd class="font-medium">{{ claims.name }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <dt>Nova role</dt>
+                            <dd class="font-medium">{{ role|default:"No membership" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="nova-card bg-base-100">
+                <div class="card-body">
+                    <h2 class="card-title">Generated groups</h2>
+                    <div class="space-y-2">
+                        {% for group in groups %}
+                            <div class="badge badge-outline">{{ group }}</div>
+                            {% empty %}
+                            <p class="text-sm text-base-content/60">No group claims for this user and tenant.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nova-card bg-base-100">
+            <div class="card-body">
+                <h2 class="card-title">Grafana org mapping</h2>
+                <pre class="bg-base-200 rounded-lg p-4 overflow-x-auto text-sm">{% for mapping in org_mapping %}
+                    {{ mapping }}
+                {% endfor %}</pre>
+            </div>
+        </div>
+
+        <div class="nova-card bg-base-100">
+            <div class="card-body">
+                <h2 class="card-title">Raw claims preview</h2>
+                <pre class="bg-base-200 rounded-lg p-4 overflow-x-auto text-sm">{{ claims }}</pre>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'ui/base.html' %}
+{% load static %}
+{% block content %}
+    <div class="nova-page-narrow">
+        <div class="mb-5">
+            <p class="text-sm font-semibold text-error">Confirm removal</p>
+            <h1 class="nova-page-title mt-2 text-3xl">Remove member</h1>
+        </div>
+        <div class="nova-card bg-base-100">
+            <div class="card-body">
+                <p>Are you sure you want to remove
+                    <span class="font-semibold">{{ member.user.email|default:member.user.username }}</span> from your
+                    team?</p>
+                <form method="post" class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+                    {% csrf_token %}
+                    <button class="btn btn-error" type="submit">Remove</button>
+                    <a class="btn btn-ghost" href="{% url 'settings_team' tenant_id_secure %}">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

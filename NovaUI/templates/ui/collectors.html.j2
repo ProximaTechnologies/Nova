@@ -1,0 +1,136 @@
+{% extends 'ui/base.html' %}
+{% load humanize %}
+{% block content %}
+    <div class="nova-page">
+        <div class="nova-page-header">
+            <div>
+                <h1 class="nova-page-title text-3xl">Collectors</h1>
+                <p class="nova-muted mt-2 text-sm">Install, monitor, and maintain collector agents for {{ tenant_name }}.</p>
+            </div>
+            {% if can_provision_collectors %}
+                <a href="{% url 'add_collector' tenant_id_secure %}" class="btn btn-primary">
+                    Add collector
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="nova-panel overflow-x-auto">
+            <table class="table table-zebra">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>UUID</th>
+                    <th>Status</th>
+                    <th>Last seen</th>
+                    <th>Alloy</th>
+                    <th>Supervisor</th>
+                    <th>Last update</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                {% if collectors %}
+                    {% for c in collectors %}
+                        <tr>
+                            <td class="font-semibold">{{ c.node_name }}</td>
+                            <td><code class="rounded bg-base-200 px-2 py-1 text-xs">{{ c.node_id }}</code></td>
+                            <td>
+                                <span class="badge min-w-max whitespace-nowrap px-3
+                                    {% if c.status == 'online' %}badge-success
+                                    {% elif c.status == 'warning' %}badge-warning
+                                    {% elif c.status == 'offline' %}badge-error
+                                    {% elif c.status == 'disabled' %}badge-ghost
+                                    {% else %}badge-outline{% endif %}">
+                                    {{ c.status_label }}
+                                </span>
+                            </td>
+                            <td>{{ c.effective_last_seen_at|default:"-" }}</td>
+                            <td>{{ c.alloy_version|default:"-" }}</td>
+                            <td>{{ c.supervisor_version|default:"-" }}</td>
+                            <td>
+                                {% if c.updated_at %}
+                                    <span title="{{ c.updated_at|date:'Y-m-d H:i:s' }}">
+                                        {{ c.updated_at|timesince }} ago
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                {% if role == "admin" or role == "editor" %}
+                                    <div class="inline-flex items-center justify-end gap-1 rounded-xl border border-base-300/80 bg-base-100/70 p-1">
+                                        <a href="{% url 'run_script_collector' tenant_id_secure c.node_id %}"
+                                           class="btn btn-ghost btn-square btn-sm text-primary hover:bg-primary/10"
+                                           title="Install"
+                                           aria-label="Install {{ c.node_name }}">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                                                 aria-hidden="true">
+                                                <path d="M12 3v11"></path>
+                                                <path d="m7 10 5 5 5-5"></path>
+                                                <path d="M5 21h14"></path>
+                                                <path d="M5 17v4"></path>
+                                                <path d="M19 17v4"></path>
+                                            </svg>
+                                            <span class="sr-only">Install</span>
+                                        </a>
+                                        <a href="{% url 'edit_collector' tenant_id_secure c.node_id %}"
+                                           class="btn btn-ghost btn-square btn-sm hover:bg-base-200"
+                                           title="Edit"
+                                           aria-label="Edit {{ c.node_name }}">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                                                 aria-hidden="true">
+                                                <path d="M12 20h9"></path>
+                                                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"></path>
+                                            </svg>
+                                            <span class="sr-only">Edit</span>
+                                        </a>
+                                        {% if role == "admin" %}
+                                            <form method="post"
+                                                  action="{% url 'delete_collector' tenant_id_secure c.node_id %}"
+                                                  onsubmit="return confirm('Delete {{ c.node_name }}?');"
+                                                  class="inline-flex">
+                                                {% csrf_token %}
+                                                <button type="submit"
+                                                        class="btn btn-ghost btn-square btn-sm text-error hover:bg-error/10"
+                                                        title="Delete"
+                                                        aria-label="Delete {{ c.node_name }}">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="1.8"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         aria-hidden="true">
+                                                        <path d="M3 6h18"></path>
+                                                        <path d="M8 6V4h8v2"></path>
+                                                        <path d="M19 6l-1 14H6L5 6"></path>
+                                                        <path d="M10 11v5"></path>
+                                                        <path d="M14 11v5"></path>
+                                                    </svg>
+                                                    <span class="sr-only">Delete</span>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="py-10 text-center">
+                            <div class="mx-auto max-w-md">
+                                <p class="font-semibold">No collectors yet</p>
+                                <p class="nova-muted mt-1 text-sm">Add a collector to start receiving host metrics and logs.</p>
+                                {% if can_provision_collectors %}
+                                    <a href="{% url 'add_collector' tenant_id_secure %}" class="btn btn-primary btn-sm mt-4">Add collector</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

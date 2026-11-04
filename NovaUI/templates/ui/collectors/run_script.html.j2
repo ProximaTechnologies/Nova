@@ -1,0 +1,61 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+    <div class="nova-page-narrow space-y-6">
+        <div>
+            <p class="text-sm font-semibold text-primary">Secure installer</p>
+            <h1 class="nova-page-title mt-2 text-3xl">Agent installation command</h1>
+            <p class="nova-muted mt-2 text-sm">Run this one-time command on {{ node.node_name }} to connect the collector.</p>
+        </div>
+
+        {% if token %}
+            <div class="alert alert-info">
+                <span>This token expires at {{ token.expires_at|date:"Y-m-d H:i" }} and can be used once.</span>
+            </div>
+
+            <div class="nova-card relative bg-base-100 p-5">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="font-semibold">Linux command</h2>
+                    <button class="btn btn-sm btn-outline" type="button" onclick="copyCommand()">
+                        Copy
+                    </button>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-200 p-4 font-mono text-sm"
+                     id="installCommand">
+                    curl -fsSL "{{ ui_url }}/agent/installer/{{ token.token }}" | sudo bash
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-warning">
+                <span>No active installer token is available. Generate a new one-time token to reinstall this collector.</span>
+            </div>
+        {% endif %}
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+            <form method="post">
+                {% csrf_token %}
+                <button class="btn btn-outline" type="submit">Generate new token</button>
+            </form>
+            <a href="{% url 'list_collectors' tenant_id_secure %}" class="btn btn-primary">Done</a>
+        </div>
+
+        <div class="toast toast-top toast-end" id="copyToast" style="display:none;">
+            <div class="alert alert-success py-2 px-4">
+                <span>Copied</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCommand() {
+            const command = document.getElementById("installCommand").innerText.trim();
+            navigator.clipboard.writeText(command).then(() => {
+                const toast = document.getElementById("copyToast");
+                toast.style.display = "block";
+                setTimeout(() => {
+                    toast.style.display = "none";
+                }, 1500);
+            });
+        }
+    </script>
+{% endblock %}

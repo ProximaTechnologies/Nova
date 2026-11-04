@@ -1,0 +1,416 @@
+{% extends 'ui/base.html' %}
+{% block content %}
+    <div class="nova-page space-y-6" data-dashboard-live-url="{{ dashboard_ws_path }}">
+        <div class="nova-page-header">
+            <div class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-sm font-semibold text-primary">Tenant dashboard</p>
+                    {% if role %}
+                        <span class="badge badge-outline">{{ role|title }}</span>
+                    {% endif %}
+                </div>
+                <h1 class="nova-page-title text-3xl sm:text-4xl">{{ tenant_name|default:"Nova" }}</h1>
+                <p class="nova-muted max-w-2xl text-sm">
+                    Live collector health, tenant limits, and Grafana access for this workspace.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                {% if grafana_url %}
+                    <a href="{{ grafana_url }}" target="_blank" rel="noopener noreferrer"
+                       class="btn btn-primary">
+                        Open Grafana
+                    </a>
+                {% else %}
+                    <button type="button" class="btn btn-outline" disabled>Grafana unavailable</button>
+                {% endif %}
+                {% if can_provision_collectors %}
+                    <a href="{% url 'add_collector' tenant_id_secure %}" class="btn btn-outline">
+                        Add collector
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if billing_status == "grace" %}
+            <div class="alert alert-warning">
+                <span>Billing is in grace period. Please contact platform support to keep service active.</span>
+            </div>
+        {% elif billing_status == "restricted" %}
+            <div class="alert alert-warning">
+                <span>Billing is restricted. Some provisioning actions may be unavailable.</span>
+            </div>
+        {% elif billing_status == "suspended" %}
+            <div class="alert alert-error">
+                <span>Billing is suspended. Collector provisioning and installer tokens are disabled.</span>
+            </div>
+        {% endif %}
+
+        <div class="stats stats-vertical w-full bg-base-100 lg:stats-horizontal">
+            <div class="stat">
+                <div class="stat-title">Collectors</div>
+                <div class="stat-value">{{ total_collectors }}</div>
+                <div class="stat-desc">{{ total_collectors_enabled }} enabled / {{ collectors_disabled }} disabled</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Online</div>
+                <div class="stat-value text-success" data-dashboard-stat="nodes_online">{{ nodes_online }}</div>
+                <div class="stat-desc">checked in within 5 minutes</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Needs Attention</div>
+                <div class="stat-value {% if needs_attention %}text-warning{% endif %}"
+                     data-dashboard-stat="needs_attention">{{ needs_attention }}</div>
+                <div class="stat-desc"><span data-dashboard-stat="nodes_warning">{{ nodes_warning }}</span> warning
+                    / <span data-dashboard-stat="nodes_offline">{{ nodes_offline }}</span> offline
+                    / <span data-dashboard-stat="nodes_never_connected">{{ nodes_never_connected }}</span> new
+                </div>
+            </div>
+            <div class="stat">
+                <div class="stat-title flex items-center gap-2">
+                    <span>Last Signal</span>
+                    <span class="badge badge-xs badge-outline" data-dashboard-live-state>Connecting</span>
+                </div>
+                <div class="stat-value text-xl" data-dashboard-stat="last_signal_at"
+                     data-live-time="{{ last_sync_at_iso }}" data-empty-label="None">
+                    {% if last_sync_at %}{{ last_sync_at|timesince }} ago{% else %}None{% endif %}
+                </div>
+                <div class="stat-desc">latest collector contact</div>
+            </div>
+        </div>
+
+        <div class="grid grid-flow-dense gap-4 md:grid-cols-3">
+            {% for item in resource_usage %}
+                <div class="nova-card bg-base-100 transition hover:-translate-y-1">
+                    <div class="card-body gap-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-sm font-semibold">{{ item.label }}</h2>
+                                <p class="text-xs text-base-content/60">{{ item.description }}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold">
+                                    {{ item.used }}<span class="text-sm font-normal text-base-content/60"> /
+                                    {{ item.limit_label }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <progress class="progress progress-primary w-full" value="{{ item.percent }}"
+                                  max="100"></progress>
+                        <div class="text-xs text-base-content/60">
+                            {% if item.has_limit %}
+                                {{ item.percent }}% of limit used
+                            {% elif item.limit_is_zero %}
+                                No allowance configured
+                            {% else %}
+                                Limit not configured
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-3">
+            <div class="nova-card bg-base-100 xl:col-span-2">
+                <div class="card-body">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="card-title">Collector health</h2>
+                            <p class="nova-muted text-sm">Runtime state is calculated from the latest check-in
+                                and config poll.</p>
+                        </div>
+                        <a href="{% url 'list_collectors' tenant_id_secure %}" class="btn btn-outline btn-sm">View all</a>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {% for status in status_cards %}
+                            <div class="rounded-xl border border-base-300/80 bg-base-200/35 p-4 transition hover:bg-base-200/70">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span class="text-sm font-medium">{{ status.label }}</span>
+                                    <span class="badge {{ status.badge_class }}"
+                                          data-status-count="{{ status.key }}">{{ status.count }}</span>
+                                </div>
+                                <p class="mt-2 text-xs text-base-content/60">{{ status.description }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-base-300/80">
+                        <table class="table table-zebra">
+                            <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Last seen</th>
+                                <th>Alloy</th>
+                                <th>Supervisor</th>
+                                <th>Updated</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for c in recent_collectors %}
+                                <tr data-node-row="{{ c.node_id }}">
+                                    <td class="font-medium">{{ c.node_name }}</td>
+                                    <td>
+                                        <span data-node-status class="badge min-w-max whitespace-nowrap px-3
+                                            {% if c.status == 'online' %}badge-success
+                                            {% elif c.status == 'warning' %}badge-warning
+                                            {% elif c.status == 'offline' %}badge-error
+                                            {% elif c.status == 'disabled' %}badge-ghost
+                                            {% else %}badge-outline{% endif %}">
+                                            {{ c.status_label }}
+                                        </span>
+                                    </td>
+                                    <td data-node-last-signal data-live-time="
+                                            {% if c.effective_last_seen_at %}{{ c.effective_last_seen_at.isoformat }}{% endif %}"
+                                        data-empty-label="-">
+                                        {% if c.effective_last_seen_at %}
+                                            {{ c.effective_last_seen_at|timesince }} ago
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td data-node-alloy-version>{{ c.alloy_version|default:"-" }}</td>
+                                    <td data-node-supervisor-version>{{ c.supervisor_version|default:"-" }}</td>
+                                    <td>{{ c.updated_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-base-content/60">
+                                        No collectors yet.
+                                        {% if can_provision_collectors %}
+                                            <a href="{% url 'add_collector' tenant_id_secure %}"
+                                               class="link link-primary">Add the first collector</a>.
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nova-card bg-base-100">
+                <div class="card-body">
+                    <h2 class="card-title">Tenant operations</h2>
+                    <div class="space-y-4 text-sm">
+                        <div class="flex justify-between gap-3">
+                            <span class="text-base-content/60">Grafana org</span>
+                            <span class="font-medium">{% if grafana_org_id %}{{ grafana_org_id }}{% else %}
+                                -{% endif %}</span>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <span class="text-base-content/60">Grafana access</span>
+                            <span class="font-medium">{% if grafana_configured %}Configured{% else %}Missing
+                                URL{% endif %}</span>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <span class="text-base-content/60">Your role</span>
+                            <span class="font-medium">{{ role|default:"-"|title }}</span>
+                        </div>
+                    </div>
+                    {% if grafana_url %}
+                        <div class="card-actions mt-4">
+                            <a href="{{ grafana_url }}" target="_blank" rel="noopener noreferrer"
+                               class="btn btn-primary btn-block">
+                                Open Grafana
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="nova-card bg-base-100">
+            <div class="card-body">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="card-title">Enabled collector features</h2>
+                        <p class="nova-muted text-sm">Feature coverage across all collectors in this
+                            tenant.</p>
+                    </div>
+                    <span class="text-sm text-base-content/60">{{ total_collectors }} collectors</span>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {% for feature in feature_summary %}
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-3 text-sm">
+                                <span class="font-medium">{{ feature.label }}</span>
+                                <span class="text-base-content/60">{{ feature.count }}</span>
+                            </div>
+                            <progress class="progress progress-accent w-full" value="{{ feature.percent }}"
+                                      max="100"></progress>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block extra_js %}
+    <script>
+        (function () {
+            const root = document.querySelector("[data-dashboard-live-url]");
+            if (!root) {
+                return;
+            }
+
+            const liveState = document.querySelector("[data-dashboard-live-state]");
+            const badgeClasses = ["badge-success", "badge-warning", "badge-error", "badge-ghost", "badge-outline"];
+            const statusBadgeClass = {
+                online: "badge-success",
+                warning: "badge-warning",
+                offline: "badge-error",
+                disabled: "badge-ghost",
+                never_connected: "badge-outline",
+            };
+
+            function relativeTime(isoValue, emptyLabel) {
+                if (!isoValue) {
+                    return emptyLabel || "-";
+                }
+                const timestamp = Date.parse(isoValue);
+                if (Number.isNaN(timestamp)) {
+                    return emptyLabel || "-";
+                }
+                const seconds = Math.max(Math.floor((Date.now() - timestamp) / 1000), 0);
+                if (seconds < 5) {
+                    return "Just now";
+                }
+                if (seconds < 60) {
+                    return seconds + "s ago";
+                }
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) {
+                    return minutes + "m ago";
+                }
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) {
+                    return hours + "h ago";
+                }
+                return Math.floor(hours / 24) + "d ago";
+            }
+
+            function refreshRelativeTimes() {
+                document.querySelectorAll("[data-live-time]").forEach(function (element) {
+                    element.textContent = relativeTime(element.dataset.liveTime, element.dataset.emptyLabel);
+                });
+            }
+
+            function setLiveState(label, badgeClass) {
+                if (!liveState) {
+                    return;
+                }
+                liveState.textContent = label;
+                liveState.classList.remove("badge-success", "badge-warning", "badge-error", "badge-outline");
+                liveState.classList.add(badgeClass);
+            }
+
+            function setDashboardStat(name, value) {
+                document.querySelectorAll("[data-dashboard-stat='" + name + "']").forEach(function (element) {
+                    element.textContent = value;
+                });
+            }
+
+            function setStatusBadge(element, status, label) {
+                if (!element) {
+                    return;
+                }
+                element.classList.remove(...badgeClasses);
+                element.classList.add(statusBadgeClass[status] || "badge-outline");
+                element.textContent = label;
+            }
+
+            function applyPayload(payload) {
+                if (payload.type !== "dashboard.status") {
+                    return;
+                }
+
+                const lastSignal = document.querySelector("[data-dashboard-stat='last_signal_at']");
+                if (lastSignal) {
+                    lastSignal.dataset.liveTime = payload.last_signal_at || "";
+                    lastSignal.textContent = relativeTime(lastSignal.dataset.liveTime, lastSignal.dataset.emptyLabel);
+                }
+
+                setDashboardStat("nodes_online", payload.nodes_online);
+                setDashboardStat("needs_attention", payload.needs_attention);
+                setDashboardStat("nodes_warning", payload.nodes_warning);
+                setDashboardStat("nodes_offline", payload.nodes_offline);
+                setDashboardStat("nodes_never_connected", payload.nodes_never_connected);
+
+                Object.entries(payload.status_counts || {}).forEach(function ([status, count]) {
+                    document.querySelectorAll("[data-status-count='" + status + "']").forEach(function (element) {
+                        element.textContent = count;
+                    });
+                });
+
+                (payload.collectors || []).forEach(function (collector) {
+                    const row = document.querySelector("[data-node-row='" + collector.node_id + "']");
+                    if (!row) {
+                        return;
+                    }
+                    setStatusBadge(row.querySelector("[data-node-status]"), collector.status, collector.status_label);
+                    const lastSignalCell = row.querySelector("[data-node-last-signal]");
+                    if (lastSignalCell) {
+                        lastSignalCell.dataset.liveTime = collector.last_signal_at || "";
+                        lastSignalCell.textContent = relativeTime(
+                            lastSignalCell.dataset.liveTime,
+                            lastSignalCell.dataset.emptyLabel
+                        );
+                    }
+                    const alloyVersionCell = row.querySelector("[data-node-alloy-version]");
+                    if (alloyVersionCell) {
+                        alloyVersionCell.textContent = collector.alloy_version || "-";
+                    }
+                    const supervisorVersionCell = row.querySelector("[data-node-supervisor-version]");
+                    if (supervisorVersionCell) {
+                        supervisorVersionCell.textContent = collector.supervisor_version || "-";
+                    }
+                });
+            }
+
+            function connectDashboardSocket() {
+                if (!("WebSocket" in window)) {
+                    setLiveState("Unavailable", "badge-error");
+                    return;
+                }
+
+                const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+                const socket = new WebSocket(protocol + "://" + window.location.host + root.dataset.dashboardLiveUrl);
+                setLiveState("Connecting", "badge-outline");
+
+                socket.addEventListener("open", function () {
+                    setLiveState("Live", "badge-success");
+                });
+
+                socket.addEventListener("message", function (event) {
+                    try {
+                        applyPayload(JSON.parse(event.data));
+                    } catch (error) {
+                        setLiveState("Error", "badge-error");
+                    }
+                });
+
+                socket.addEventListener("close", function (event) {
+                    if ([4401, 4403, 4404].includes(event.code)) {
+                        setLiveState("Unavailable", "badge-error");
+                        return;
+                    }
+                    setLiveState("Reconnecting", "badge-warning");
+                    window.setTimeout(connectDashboardSocket, 3000);
+                });
+
+                socket.addEventListener("error", function () {
+                    setLiveState("Error", "badge-error");
+                });
+            }
+
+            refreshRelativeTimes();
+            window.setInterval(refreshRelativeTimes, 1000);
+            connectDashboardSocket();
+        })();
+    </script>
+{% endblock %}

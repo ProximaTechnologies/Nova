@@ -1,0 +1,131 @@
+{% load widget_tweaks %}
+<input type="hidden" name="platform" value="linux">
+
+<section class="nova-card grid gap-4 bg-base-100 p-5 md:grid-cols-2">
+    <label class="form-control">
+        <span class="label-text font-medium">Collector name</span>
+        {{ node_form.node_name|add_class:"input input-bordered" }}
+        {% if node_form.node_name.errors %}
+            <span class="mt-2 text-sm text-error">{{ node_form.node_name.errors }}</span>
+        {% endif %}
+    </label>
+</section>
+
+<section class="nova-card bg-base-100 p-5">
+    <div class="mb-5 flex flex-col gap-1">
+        <p class="text-sm font-semibold text-primary">Step 2</p>
+        <h2 class="text-xl font-semibold">Choose Linux features</h2>
+        <p class="nova-muted text-sm">Enable at least one monitoring or logging source for this collector.</p>
+    </div>
+
+    {% if features_form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+            <span>{{ features_form.non_field_errors }}</span>
+        </div>
+    {% endif %}
+
+    <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+            <h3 class="text-sm font-semibold text-base-content/70">Metrics</h3>
+            <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                <span>
+                    <span class="block font-medium">Linux system metrics</span>
+                    <span class="nova-muted block text-sm">CPU, memory, disk, and host health.</span>
+                </span>
+                {{ features_form.linuxMonitor }}
+            </label>
+            <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                <span>
+                    <span class="block font-medium">Container metrics</span>
+                    <span class="nova-muted block text-sm">Runtime and container resource usage.</span>
+                </span>
+                {{ features_form.containerMonitor }}
+            </label>
+        </div>
+
+        <div class="space-y-2">
+            <h3 class="text-sm font-semibold text-base-content/70">Logs</h3>
+            <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                <span>
+                    <span class="block font-medium">systemd journal</span>
+                    <span class="nova-muted block text-sm">Service and host journal entries.</span>
+                </span>
+                {{ features_form.journalLog }}
+            </label>
+            <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                <span>
+                    <span class="block font-medium">Docker logs</span>
+                    <span class="nova-muted block text-sm">Container stdout and stderr streams.</span>
+                </span>
+                {{ features_form.dockerLogs }}
+            </label>
+            <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-base-300/80 bg-base-200/30 p-4 transition hover:bg-base-200/60">
+                <span>
+                    <span class="block font-medium">File/path logs</span>
+                    <span class="nova-muted block text-sm">Configured files and application paths.</span>
+                </span>
+                {{ features_form.fileMonitor }}
+            </label>
+        </div>
+    </div>
+</section>
+
+<section class="nova-card bg-base-100 p-5">
+    <div class="mb-4 flex flex-col gap-1">
+        <h2 class="text-lg font-semibold">File monitors</h2>
+        <p class="nova-muted text-sm">Up to {{ file_monitor_limit }} file path{{ file_monitor_limit|pluralize }} on this plan.</p>
+    </div>
+
+    {{ file_monitor_formset.management_form }}
+    {% if file_monitor_formset.non_form_errors %}
+        <div class="alert alert-error mb-4">
+            <span>{{ file_monitor_formset.non_form_errors }}</span>
+        </div>
+    {% endif %}
+
+    <div class="grid gap-3">
+        {% for form in file_monitor_formset %}
+            <div class="rounded-xl border border-base-300/80 bg-base-200/30 p-4">
+                {{ form.id }}
+                <div class="grid gap-3 md:grid-cols-[1fr_2fr_auto] md:items-start">
+                    <label class="form-control">
+                        <span class="label-text">Label</span>
+                        {{ form.label }}
+                        {% if form.label.errors %}
+                            <span class="mt-1 text-sm text-error">{{ form.label.errors }}</span>
+                        {% endif %}
+                    </label>
+                    <label class="form-control">
+                        <span class="label-text">Absolute path</span>
+                        {{ form.file_path }}
+                        {% if form.file_path.errors %}
+                            <span class="mt-1 text-sm text-error">{{ form.file_path.errors }}</span>
+                        {% endif %}
+                    </label>
+                    <label class="form-control min-w-24">
+                        <span class="label-text">Enabled</span>
+                        <span class="pt-3">{{ form.enabled }}</span>
+                    </label>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <button class="btn btn-primary" type="submit" id="collector-add-submit">
+        <span class="loading loading-spinner loading-sm hidden" aria-hidden="true"></span>
+        <span data-submit-label>Save</span>
+    </button>
+    <button type="button"
+            class="btn btn-ghost"
+            hx-get="{% url 'add_collector_platform_step' tenant_id_secure %}"
+            hx-target="#collector-flow-step"
+            hx-swap="innerHTML">
+        Back
+    </button>
+    <a href="{{ collector_list_url }}" class="btn btn-ghost">Cancel</a>
+    <span class="hidden text-sm text-base-content/60" id="collector-add-status" role="status" aria-live="polite">
+        Creating collector and syncing GitOps resources...
+    </span>
+</div>

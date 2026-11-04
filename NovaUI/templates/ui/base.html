@@ -1,0 +1,418 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Nova observability control plane">
+    <title>{{ title|default:"Nova" }}</title>
+    <script>
+        (() => {
+            try {
+                const theme = localStorage.getItem("theme");
+                if (theme === "light" || theme === "dark") {
+                    document.documentElement.setAttribute("data-theme", theme);
+                }
+            } catch (error) {
+                document.documentElement.setAttribute("data-theme", "light");
+            }
+        })();
+    </script>
+
+    <link href="{% static 'vendor/daisyui/daisyui5.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="{% static 'vendor/daisyui/themes.css' %}" rel="stylesheet" type="text/css"/>
+    <script src="{% static 'vendor/tailwind/browser-v4.js' %}"></script>
+    <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+
+    <style>
+        :root,
+        [data-theme="light"] {
+            color-scheme: light;
+            --color-base-100: oklch(99% 0.004 255);
+            --color-base-200: oklch(96.5% 0.009 255);
+            --color-base-300: oklch(91.5% 0.014 255);
+            --color-base-content: oklch(22% 0.025 255);
+            --color-primary: oklch(47% 0.14 248);
+            --color-primary-content: oklch(98% 0.006 255);
+            --color-secondary: oklch(42% 0.05 255);
+            --color-secondary-content: oklch(98% 0.006 255);
+            --color-accent: oklch(57% 0.12 190);
+            --color-accent-content: oklch(98% 0.006 255);
+            --color-neutral: oklch(25% 0.03 255);
+            --color-neutral-content: oklch(97% 0.006 255);
+            --radius-selector: 0.75rem;
+            --radius-field: 0.625rem;
+            --radius-box: 0.875rem;
+            --depth: 0;
+            --noise: 0;
+        }
+
+        [data-theme="dark"] {
+            color-scheme: dark;
+            --color-base-100: oklch(20% 0.023 255);
+            --color-base-200: oklch(16.5% 0.021 255);
+            --color-base-300: oklch(26% 0.026 255);
+            --color-base-content: oklch(94% 0.015 255);
+            --color-primary: oklch(68% 0.13 248);
+            --color-primary-content: oklch(17% 0.03 255);
+            --color-secondary: oklch(78% 0.035 255);
+            --color-secondary-content: oklch(16% 0.021 255);
+            --color-accent: oklch(72% 0.11 190);
+            --color-accent-content: oklch(15% 0.02 190);
+            --color-neutral: oklch(87% 0.013 255);
+            --color-neutral-content: oklch(18% 0.023 255);
+            --radius-selector: 0.75rem;
+            --radius-field: 0.625rem;
+            --radius-box: 0.875rem;
+            --depth: 0;
+            --noise: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100dvh;
+            overflow-x: hidden;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                linear-gradient(180deg, color-mix(in oklab, var(--color-base-200) 84%, var(--color-primary) 16%), var(--color-base-100) 24rem),
+                var(--color-base-100);
+            color: var(--color-base-content);
+            letter-spacing: 0;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(color-mix(in oklab, var(--color-base-content) 5%, transparent) 1px, transparent 1px),
+                linear-gradient(90deg, color-mix(in oklab, var(--color-base-content) 5%, transparent) 1px, transparent 1px);
+            background-size: 36px 36px;
+            mask-image: linear-gradient(180deg, black, transparent 68%);
+            opacity: 0.42;
+        }
+
+        .nova-app-shell {
+            min-height: 100dvh;
+        }
+
+        .nova-sidebar {
+            background:
+                linear-gradient(180deg, color-mix(in oklab, var(--color-base-100) 94%, var(--color-primary) 6%), var(--color-base-200));
+            border-right: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+        }
+
+        .nova-brand-mark {
+            box-shadow: 0 10px 30px color-mix(in oklab, var(--color-primary) 34%, transparent);
+        }
+
+        .nova-page {
+            width: min(100%, 88rem);
+            margin-inline: auto;
+        }
+
+        .nova-page-narrow {
+            width: min(100%, 56rem);
+            margin-inline: auto;
+        }
+
+        .nova-page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .nova-page-title {
+            max-width: 56rem;
+            text-wrap: balance;
+            font-weight: 750;
+            line-height: 1.05;
+            letter-spacing: 0;
+        }
+
+        .nova-muted {
+            color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
+        }
+
+        .nova-panel,
+        .nova-card,
+        .card,
+        .stats {
+            border: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+            background: color-mix(in oklab, var(--color-base-100) 91%, transparent);
+            box-shadow: 0 24px 70px color-mix(in oklab, var(--color-neutral) 10%, transparent);
+            backdrop-filter: blur(14px);
+        }
+
+        .nova-panel {
+            border-radius: var(--radius-box);
+        }
+
+        .nova-card,
+        .card {
+            border-radius: var(--radius-box);
+        }
+
+        .btn {
+            min-height: 2.625rem;
+            border-radius: var(--radius-field);
+            font-weight: 650;
+            letter-spacing: 0;
+            transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0) scale(0.99);
+        }
+
+        .btn:focus-visible,
+        .input:focus,
+        .select:focus,
+        .textarea:focus,
+        .checkbox:focus-visible,
+        .toggle:focus-visible {
+            outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, white 30%);
+            outline-offset: 2px;
+        }
+
+        .input,
+        .select,
+        .textarea {
+            border-color: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+            background: color-mix(in oklab, var(--color-base-100) 94%, var(--color-base-200) 6%);
+            color: var(--color-base-content);
+        }
+
+        .table {
+            font-size: 0.925rem;
+        }
+
+        .table :where(th) {
+            color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .table :where(tbody tr) {
+            border-color: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+        }
+
+        .table :where(tbody tr:hover) {
+            background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+        }
+
+        .badge {
+            border-radius: 999px;
+            font-weight: 650;
+        }
+
+        .stat-value,
+        code,
+        pre {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .progress {
+            height: 0.55rem;
+        }
+
+        .alert {
+            border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+            border-radius: var(--radius-box);
+            box-shadow: none;
+        }
+
+        .menu :where(li > a, li > details > summary) {
+            border-radius: 0.75rem;
+            transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+        }
+
+        .menu :where(li > a:hover, li > details > summary:hover) {
+            transform: translateX(2px);
+        }
+
+        .menu :where(li > a.active, li > details > summary.active) {
+            background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+            color: var(--color-primary);
+            font-weight: 700;
+        }
+
+        .menu-title {
+            color: color-mix(in oklab, var(--color-base-content) 48%, transparent);
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .nova-skip-link {
+            position: fixed;
+            left: 1rem;
+            top: 1rem;
+            z-index: 50;
+            transform: translateY(-150%);
+            transition: transform 160ms ease;
+        }
+
+        .nova-skip-link:focus {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 767px) {
+            .nova-page-header {
+                flex-direction: column;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<a href="#main-content" class="nova-skip-link btn btn-primary btn-sm">Skip to content</a>
+
+<div class="drawer lg:drawer-open nova-app-shell">
+    <input id="app-drawer" type="checkbox" class="drawer-toggle"/>
+
+    <div class="drawer-content flex min-h-screen flex-col">
+        <div class="navbar sticky top-0 z-30 border-b border-base-300/70 bg-base-100/90 backdrop-blur lg:!hidden">
+            <div class="flex-none">
+                <label for="app-drawer" aria-label="open sidebar" class="btn btn-ghost btn-square">
+                    <span class="flex h-4 w-5 flex-col justify-between" aria-hidden="true">
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                    </span>
+                </label>
+            </div>
+            <div class="flex-1">
+                <a href="{% url 'tenant_list' %}" class="btn btn-ghost text-lg font-bold">Nova</a>
+            </div>
+            <div class="flex-none">
+                <select aria-label="Color mode" data-choose-theme class="select select-sm select-bordered w-28">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+        </div>
+
+        <main id="main-content" class="flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+            {% if messages %}
+                <div class="nova-page mb-5 space-y-2">
+                    {% for message in messages %}
+                        <div class="alert
+                            {% if message.tags == 'success' %}alert-success
+                            {% elif message.tags == 'error' %}alert-error
+                            {% elif message.tags == 'warning' %}alert-warning
+                            {% elif message.tags == 'info' %}alert-info
+                            {% endif %}">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}
+                <div class="nova-page-narrow nova-panel p-6">
+                    <h1 class="nova-page-title text-3xl">Welcome to Nova</h1>
+                    <p class="nova-muted mt-3">This route is not configured. Contact support with the action you were taking.</p>
+                </div>
+            {% endblock %}
+        </main>
+    </div>
+
+    <div class="drawer-side z-40">
+        <label for="app-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+
+        <aside class="nova-sidebar flex min-h-full w-72 flex-col">
+            <div class="hidden items-center gap-3 border-b border-base-300/70 px-5 py-5 lg:flex">
+                <span class="nova-brand-mark inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-black text-primary-content">N</span>
+                <div class="min-w-0">
+                    <a href="{% url 'tenant_list' %}" class="block truncate text-lg font-bold">Nova</a>
+                    <p class="truncate text-xs nova-muted">{{ tenant_name|default:"Control plane" }}</p>
+                </div>
+            </div>
+
+            <div class="hidden px-4 pb-2 pt-4 lg:block">
+                <label class="text-xs font-semibold nova-muted" for="theme-select-desktop">Color mode</label>
+                <select id="theme-select-desktop" aria-label="Color mode" data-choose-theme class="select select-bordered select-sm mt-2 w-full">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+
+            <ul class="menu grow p-4">
+                <li class="menu-title">Workspace</li>
+                <li>
+                    <a class="{% if request.path == '/' %}active{% endif %}" href="{% url 'tenant_list' %}">
+                        Tenants
+                    </a>
+                </li>
+                {% if tenant_name %}
+                    {% url 'dashboard' tenant_id_secure as dashboard_url %}
+                    {% url 'list_collectors' tenant_id_secure as collectors_url %}
+                    {% url 'settings_team' tenant_id_secure as team_url %}
+                    {% url 'settings_audit' tenant_id_secure as audit_url %}
+                    {% url 'settings_billing' tenant_id_secure as billing_url %}
+                    <li>
+                        <a class="{% if request.path == dashboard_url %}active{% endif %}" href="{{ dashboard_url }}">
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a class="{% if collectors_url in request.path %}active{% endif %}" href="{{ collectors_url }}">
+                            Collectors
+                        </a>
+                    </li>
+                    <li class="menu-title mt-4">Administration</li>
+                    <li>
+                        <details {% if '/settings/' in request.path %}open{% endif %}>
+                            <summary class="{% if '/settings/' in request.path %}active{% endif %}">Settings</summary>
+                            <ul>
+                                <li><a class="{% if request.path == team_url %}active{% endif %}" href="{{ team_url }}">Team</a></li>
+                                {% if billing_enabled %}<li><a class="{% if request.path == billing_url %}active{% endif %}" href="{{ billing_url }}">Billing</a></li>{% endif %}
+                                <li><a class="{% if request.path == audit_url %}active{% endif %}" href="{{ audit_url }}">Audit log</a></li>
+                                <li><a href="/accounts/logout">Log out</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                {% endif %}
+            </ul>
+
+            <div class="border-t border-base-300/70 p-4 text-xs nova-muted">
+                <p class="font-semibold text-base-content">Private beta</p>
+                <p class="mt-1">Tenant-scoped observability and collector control.</p>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script src="{% static 'vendor/theme-change/theme-change.js' %}" defer></script>
+{% block extra_js %}
+{% endblock %}
+</body>
+</html>

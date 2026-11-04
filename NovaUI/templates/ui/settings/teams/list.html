@@ -1,0 +1,66 @@
+{% extends 'ui/base.html' %}
+{% load static %}
+{% block content %}
+    {% if role %}
+    <div class="nova-page">
+        <div class="nova-page-header">
+            <div>
+                <p class="text-sm font-semibold text-primary">Access control</p>
+                <h1 class="nova-page-title mt-2 text-3xl">Team</h1>
+                <p class="nova-muted mt-2 text-sm">Review members and tenant roles.</p>
+            </div>
+            {% if role == "admin" %}
+                <a href="{% url 'settings_team_add' tenant_id_secure %}" class="btn btn-primary">Add member</a>
+            {% endif %}
+
+        </div>
+
+        <div class="nova-card bg-base-100">
+            <div class="card-body p-0">
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Added</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for m in members %}
+                            <tr>
+                                <td class="font-medium">{{ m.user.email|default:m.user.username }}</td>
+                                <td><span class="badge badge-outline">{{ m.get_role_display }}</span></td>
+                                <td>{{ m.created_at|date:"Y-m-d H:i" }}</td>
+                                {% if m.user != current_user and role == "admin" %}
+                                    <td class="text-right">
+                                        <a class="btn btn-sm"
+                                           href="{% url 'settings_team_edit' tenant_id_secure m.pk %}">Edit</a>
+                                        <a class="btn btn-sm btn-error"
+                                           href="{% url 'settings_team_delete' tenant_id_secure m.pk %}">Delete</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="py-10 text-center">
+                                    <p class="font-semibold">No team members yet</p>
+                                    <p class="nova-muted mt-1 text-sm">Invite members to grant tenant access.</p>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {% else %}
+        <div class="nova-page-narrow nova-panel p-6">
+            <h1 class="nova-page-title text-2xl">No team access</h1>
+            <p class="nova-muted mt-2">Contact your administrator to be added to a tenant team.</p>
+        </div>
+    {% endif %}
+{% endblock %}

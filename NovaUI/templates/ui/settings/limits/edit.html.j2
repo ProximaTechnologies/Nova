@@ -1,0 +1,106 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+    <div class="nova-page-narrow space-y-6">
+        <div>
+            <p class="text-sm font-semibold text-primary">Limits</p>
+            <h1 class="nova-page-title mt-2 text-3xl">{{ title|default:"Team limits" }}</h1>
+            {% if tenant %}
+                <p class="nova-muted mt-2 text-sm">Team: <span class="font-medium text-base-content">{{ tenant.name }}</span></p>
+            {% endif %}
+        </div>
+
+        {% if not can_edit_limits %}
+            <div class="alert alert-info">
+                <span>Limits are managed by platform administrators during the private beta. Contact support to request a change.</span>
+            </div>
+        {% endif %}
+
+        <form method="post" class="nova-card bg-base-100">
+            {% csrf_token %}
+            <div class="card-body">
+                <h2 class="card-title">{% if can_edit_limits %}Edit usage limits{% else %}Current usage
+                    limits{% endif %}</h2>
+                <p class="nova-muted text-sm">
+                    {% if can_edit_limits %}
+                        Control how many resources this team can use.
+                    {% else %}
+                        These limits define the resources your team can use.
+                    {% endif %}
+                </p>
+
+                <div class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="form-control">
+                        <label class="label" for="id_max_nodes">
+                            <span class="label-text">Max nodes</span>
+                        </label>
+                        <input
+                                id="id_max_nodes"
+                                name="max_nodes"
+                                type="number"
+                                inputmode="numeric"
+                                min="0"
+                                class="input input-bordered"
+                                placeholder="e.g. 5"
+                                value="{{ limit.max_nodes|default_if_none:'' }}"
+                                required
+                                {% if not can_edit_limits %}disabled{% endif %}
+                        />
+                        <label class="label">
+                            <span class="label-text-alt text-base-content/60">Number of collectors allowed.</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" for="id_max_clusters">
+                            <span class="label-text">Max clusters</span>
+                        </label>
+                        <input
+                                id="id_max_clusters"
+                                name="max_clusters"
+                                type="number"
+                                inputmode="numeric"
+                                min="0"
+                                class="input input-bordered"
+                                placeholder="e.g. 1"
+                                value="{{ limit.max_clusters|default_if_none:'' }}"
+                                required
+                                {% if not can_edit_limits %}disabled{% endif %}
+                        />
+                        <label class="label">
+                            <span class="label-text-alt text-base-content/60">Clusters billed per control plane & vCPU.</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control md:col-span-2">
+                        <label class="label" for="id_max_vcpus">
+                            <span class="label-text">Max vCPUs</span>
+                        </label>
+                        <input
+                                id="id_max_vcpus"
+                                name="max_vcpus"
+                                type="number"
+                                inputmode="numeric"
+                                min="0"
+                                class="input input-bordered"
+                                placeholder="e.g. 32"
+                                value="{{ limit.max_vcpus|default_if_none:'' }}"
+                                required
+                                {% if not can_edit_limits %}disabled{% endif %}
+                        />
+                        <label class="label">
+                            <span class="label-text-alt text-base-content/60">Total vCPUs across monitored clusters.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card-actions mt-4 justify-end">
+                    <a href="{% url 'settings_team' tenant_id_secure %}" class="btn btn-ghost">Cancel</a>
+                    {% if can_edit_limits %}
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "ui/base.html" %}
+{% block content %}
+    <div class="nova-page-narrow">
+        <div class="mb-6">
+            <p class="text-sm font-semibold text-primary">Provisioning</p>
+            <h1 class="nova-page-title mt-2 text-3xl">Add collector</h1>
+            <p class="nova-muted mt-2 text-sm">Choose a collector type, enable features, then save.</p>
+        </div>
+
+        <form method="post" class="grid gap-6" id="collector-add-form">
+            {% csrf_token %}
+            <div id="collector-flow-step" class="grid gap-6">
+                {% if selected_platform == "linux" %}
+                    {% include "ui/collectors/partials/add_features_step.html.j2" %}
+                {% else %}
+                    {% include "ui/collectors/partials/add_platform_step.html.j2" %}
+                {% endif %}
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (() => {
+            const form = document.getElementById("collector-add-form");
+            if (!form) {
+                return;
+            }
+
+            form.addEventListener("submit", (event) => {
+                if (form.dataset.submitting === "true") {
+                    event.preventDefault();
+                    return;
+                }
+
+                if (!form.checkValidity()) {
+                    return;
+                }
+
+                const submitButton = event.submitter || document.getElementById("collector-add-submit");
+                const submitLabel = submitButton?.querySelector("[data-submit-label]");
+                const spinner = submitButton?.querySelector(".loading");
+                const status = document.getElementById("collector-add-status");
+
+                form.dataset.submitting = "true";
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.setAttribute("aria-busy", "true");
+                }
+                spinner?.classList.remove("hidden");
+                status?.classList.remove("hidden");
+                if (submitLabel) {
+                    submitLabel.textContent = "Creating...";
+                }
+            });
+        })();
+    </script>
+{% endblock %}

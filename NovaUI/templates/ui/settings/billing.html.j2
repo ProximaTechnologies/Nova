@@ -1,0 +1,95 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+    <div class="nova-page-narrow space-y-6">
+        <div>
+            <p class="text-sm font-semibold text-primary">Billing</p>
+            <h1 class="nova-page-title mt-2 text-3xl">{{ title|default:"Billing" }}</h1>
+            {% if tenant %}
+                <p class="nova-muted mt-2 text-sm">Team: <span class="font-medium text-base-content">{{ tenant.name }}</span></p>
+            {% endif %}
+        </div>
+
+        <div class="alert alert-info">
+            <span>Billing is managed manually by the administrators of this installation.</span>
+        </div>
+
+        {% if not billing %}
+            <div class="alert alert-warning">
+                <span>Billing plan is not configured for this team. Please contact support.</span>
+            </div>
+        {% endif %}
+
+        <div class="stats stats-vertical bg-base-100 lg:stats-horizontal">
+            <div class="stat">
+                <div class="stat-title">Plan</div>
+                <div class="stat-value text-xl">{{ billing.name|default:"Not set" }}</div>
+                <div class="stat-desc">Monthly pricing</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Total estimate</div>
+                <div class="stat-value text-xl">
+                    {% if total_cost != None %}${{ total_cost }}{% else %}-{% endif %}
+                </div>
+                <div class="stat-desc">Per month based on limits</div>
+            </div>
+        </div>
+
+        <div class="nova-card bg-base-100">
+            <div class="card-body">
+                <h2 class="card-title">Cost breakdown</h2>
+                <p class="nova-muted text-sm">Calculated from your current limits.</p>
+
+                <div class="mt-2 overflow-x-auto rounded-xl border border-base-300/80">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>Unit price</th>
+                            <th>Limit</th>
+                            <th>Subtotal</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Nodes</td>
+                            <td>
+                                {% if billing %}${{ billing.price_per_node }}{% else %}-{% endif %}
+                            </td>
+                            <td>{{ limit.max_nodes|default:0 }}</td>
+                            <td>
+                                {% if node_subtotal != None %}${{ node_subtotal }}{% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Clusters</td>
+                            <td>
+                                {% if billing %}${{ billing.price_per_cluster }}{% else %}-{% endif %}
+                            </td>
+                            <td>{{ limit.max_clusters|default:0 }}</td>
+                            <td>
+                                {% if cluster_subtotal != None %}${{ cluster_subtotal }}{% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>vCPUs</td>
+                            <td>
+                                {% if billing %}${{ billing.price_per_vcpu }}{% else %}-{% endif %}
+                            </td>
+                            <td>{{ limit.max_vcpus|default:0 }}</td>
+                            <td>
+                                {% if vcpu_subtotal != None %}${{ vcpu_subtotal }}{% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex justify-end text-sm text-base-content/60">
+                    Total per month: {% if total_cost != None %}
+                    <span class="font-semibold text-base-content ml-2">${{ total_cost }}</span>{% else %}-{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

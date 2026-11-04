@@ -1,0 +1,35 @@
+<section class="nova-card bg-base-100 p-5">
+    <div class="mb-5">
+        <p class="text-sm font-semibold text-primary">Step 1</p>
+        <h2 class="mt-1 text-xl font-semibold">Choose collector type</h2>
+        <p class="nova-muted mt-2 text-sm">Select the environment this collector will run on.</p>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-3">
+        <button type="button"
+                class="group rounded-xl border border-primary/30 bg-primary/10 p-4 text-left transition hover:-translate-y-0.5 hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                hx-get="{% url 'add_collector_features_step' tenant_id_secure %}?platform=linux"
+                hx-target="#collector-flow-step"
+                hx-swap="innerHTML">
+            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-content">LX</span>
+            <span class="mt-4 block font-semibold">Linux</span>
+            <span class="nova-muted mt-1 block text-sm">Host metrics, container metrics, journal logs, Docker logs, and file paths.</span>
+        </button>
+
+        <button type="button"
+                class="hidden rounded-xl border border-base-300 bg-base-200/40 p-4 text-left opacity-60"
+                disabled>
+            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-base-300 text-sm font-black">WN</span>
+            <span class="mt-4 block font-semibold">Windows</span>
+            <span class="nova-muted mt-1 block text-sm">Hidden until the Windows collector path is ready.</span>
+        </button>
+
+        <button type="button"
+                class="hidden rounded-xl border border-base-300 bg-base-200/40 p-4 text-left opacity-60"
+                disabled>
+            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-base-300 text-sm font-black">K8</span>
+            <span class="mt-4 block font-semibold">Kubernetes</span>
+            <span class="nova-muted mt-1 block text-sm">Hidden until the Kubernetes collector path is ready.</span>
+        </button>
+    </div>
+</section>
