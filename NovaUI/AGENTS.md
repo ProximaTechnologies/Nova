@@ -207,8 +207,8 @@ exercised against real services.
 ## Deployment and CI
 
 - NovaUI CI runs pytest, migration checks, static collection, production checks, and a container build.
-- Security scans run separately in `security.yml`. Harbor image pushes for `dev` and `main` require the repository
-  variable `ENABLE_HARBOR_PUBLISH=true` and configured secrets.
+- Security scans run separately in `security.yml`. Image pushes for `dev` and `main` use GitHub Container Registry
+  with the automatic `GITHUB_TOKEN` and `packages: write` permission.
 - Before handing off deployment-sensitive changes, run the closest local equivalent that is practical:
 
 ```bash

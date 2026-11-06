@@ -1,0 +1,56 @@
+name: Production Image
+
+on:
+  push:
+    branches: [ "main" ]
+
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    working-directory: NovaUI
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set image name and tag
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/novaui" >> "$GITHUB_ENV"
+          echo "TAG=$GITHUB_SHA" >> "$GITHUB_ENV"
+
+      - name: Login to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build image
+        run: |
+          IMAGE_TAG="$IMAGE:$TAG" \
+          SUPERVISOR_REPO=../Nova-Supervisor \
+          scripts/build-image-with-supervisor.sh
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE:$TAG"
+
+      - name: Output pushed image
+        run: |
+          echo "Pushed image:"
+          echo "$IMAGE:$TAG"
+      - name: Tag latest
+        run: |
+          docker tag \
+            "$IMAGE:$TAG" \
+            "$IMAGE:latest"
+
+      - name: Push latest
+        run: |
+          docker push "$IMAGE:latest"

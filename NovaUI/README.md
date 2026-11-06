@@ -320,9 +320,9 @@ manual dispatch:
 - `gitleaks`: secret detection across git history with redacted SARIF output.
 
 The Trivy image scan builds from the sibling `Nova-Supervisor/` directory in
-this checkout. No private checkout token is required. Harbor publishing is
-optional and runs only with repository variable `ENABLE_HARBOR_PUBLISH=true`
-and the configured Harbor secrets.
+this checkout. No private checkout token is required. Image publishing uses GitHub Container Registry with the automatic
+`GITHUB_TOKEN`: pushes to `dev` publish `latest-dev`, and pushes to `main`
+publish `latest` under `ghcr.io/<owner>/novaui`.
 
 Local developer commands:
 

@@ -23,4 +23,5 @@ Before the first public release:
   migration steps, and known limitations in the release notes.
 
 No release, image push, or deployment is performed by the local setup commands.
-Harbor push workflows are disabled unless ENABLE_HARBOR_PUBLISH is set to true.
+Pushes to dev and main publish NovaUI images to ghcr.io/<owner>/novaui
+using GITHUB_TOKEN, tagged with the commit SHA and latest-dev or latest.
