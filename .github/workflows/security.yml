@@ -1,0 +1,424 @@
+name: Security Scanning
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    container:
+      image: semgrep/semgrep:latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        id: semgrep
+        shell: sh
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          set +e
+
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            semgrep ci --sarif --output semgrep.sarif
+          else
+            semgrep scan --config=auto --sarif --output semgrep.sarif .
+          fi
+
+          status=$?
+          printf 'exit_code=%s\n' "$status" >> "$GITHUB_OUTPUT"
+
+          if [ -s semgrep.sarif ] && python3 -m json.tool semgrep.sarif >/dev/null 2>&1; then
+            printf 'sarif_ready=true\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'sarif_ready=false\n' >> "$GITHUB_OUTPUT"
+            rm -f semgrep.sarif
+          fi
+
+          exit 0
+
+      - name: Show Semgrep results in summary
+        if: always() && steps.semgrep.outputs.sarif_ready == 'true'
+        run: python3 .github/scripts/sarif-summary.py semgrep.sarif Semgrep
+
+      - name: Upload Semgrep SARIF artifact
+        if: always() && steps.semgrep.outputs.sarif_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Semgrep SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true' && steps.semgrep.outputs.sarif_ready == 'true'
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Apply Semgrep gate
+        if: always()
+        shell: sh
+        run: |
+          status="${{ steps.semgrep.outputs.exit_code }}"
+
+          if [ -z "$status" ]; then
+            echo "Semgrep did not report an exit code."
+            exit 1
+          fi
+
+          if [ "$status" -ne 0 ]; then
+            echo "Semgrep exited with status $status."
+            exit "$status"
+          fi
+
+  detect-codeql-languages:
+    name: detect codeql languages
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.detect.outputs.languages }}
+      has_languages: ${{ steps.detect.outputs.has_languages }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Detect CodeQL languages
+        id: detect
+        shell: bash
+        run: |
+          languages=()
+
+          if git ls-files '*.py' | grep -q .; then
+            languages+=('"python"')
+          fi
+
+          if git ls-files '*.go' | grep -q .; then
+            languages+=('"go"')
+          fi
+
+          if git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' | grep -q .; then
+            languages+=('"javascript-typescript"')
+          fi
+
+          if [ "${#languages[@]}" -eq 0 ]; then
+            echo 'languages=[]' >> "$GITHUB_OUTPUT"
+            echo 'has_languages=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          joined=$(IFS=,; echo "${languages[*]}")
+          echo "languages=[$joined]" >> "$GITHUB_OUTPUT"
+          echo 'has_languages=true' >> "$GITHUB_OUTPUT"
+
+  codeql:
+    name: codeql
+    needs: detect-codeql-languages
+    if: needs.detect-codeql-languages.outputs.has_languages == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJson(needs.detect-codeql-languages.outputs.languages) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: NovaCFG/main/go.mod
+          cache-dependency-path: NovaCFG/main/go.sum
+
+      - name: Build Go components
+        if: matrix.language == 'go'
+        run: |
+          (cd Nova-Supervisor && go build ./...)
+          (cd NovaCFG/main && go build ./...)
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          category: "/language:${{ matrix.language }}"
+          output: codeql-results
+          upload: never
+
+      - name: Show CodeQL results in summary
+        if: always()
+        shell: bash
+        run: |
+          find codeql-results -name '*.sarif' -print -exec python3 .github/scripts/sarif-summary.py {} "CodeQL ${{ matrix.language }}" \;
+
+      - name: Upload CodeQL SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: codeql-${{ matrix.language }}-sarif
+          path: codeql-results
+          if-no-files-found: ignore
+
+      - name: Upload CodeQL SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true'
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: codeql-results
+          category: "/language:${{ matrix.language }}"
+
+  trivy:
+    name: trivy
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-fs.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          skip-dirs: .git,.venv,.pytest_cache,NovaUI/static/vendor,NovaUI/agent/binaries
+
+      - name: Show Trivy filesystem results in summary
+        if: always() && hashFiles('trivy-fs.sarif') != ''
+        run: python3 .github/scripts/sarif-summary.py trivy-fs.sarif "Trivy filesystem"
+
+      - name: Upload Trivy filesystem SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trivy-fs-sarif
+          path: trivy-fs.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Trivy filesystem SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true' && hashFiles('trivy-fs.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+      - name: Trivy IaC scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: config
+          scan-ref: .
+          hide-progress: true
+          format: sarif
+          output: trivy-config.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          skip-setup-trivy: true
+
+      - name: Show Trivy IaC results in summary
+        if: always() && hashFiles('trivy-config.sarif') != ''
+        run: python3 .github/scripts/sarif-summary.py trivy-config.sarif "Trivy IaC"
+
+      - name: Upload Trivy IaC SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trivy-config-sarif
+          path: trivy-config.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Trivy IaC SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true' && hashFiles('trivy-config.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Build image for Trivy
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          IMAGE_TAG=novaui-security:${{ github.sha }} \
+          SUPERVISOR_REPO=./Nova-Supervisor \
+          NovaUI/scripts/build-image-with-supervisor.sh
+
+      - name: Trivy image scan
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: novaui-security:${{ github.sha }}
+          scanners: vuln,secret,misconfig
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-image.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          skip-setup-trivy: true
+
+      - name: Show Trivy image results in summary
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        run: python3 .github/scripts/sarif-summary.py trivy-image.sarif "Trivy image"
+
+      - name: Upload Trivy image SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trivy-image-sarif
+          path: trivy-image.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Trivy image SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true' && hashFiles('trivy-image.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Gate Trivy high severity filesystem findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          skip-dirs: .git,.venv,.pytest_cache,NovaUI/static/vendor,NovaUI/agent/binaries
+          skip-setup-trivy: true
+
+      - name: Gate Trivy high severity IaC findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: config
+          scan-ref: .
+          hide-progress: true
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          skip-setup-trivy: true
+
+      - name: Gate Trivy high severity image findings
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: novaui-security:${{ github.sha }}
+          scanners: vuln,secret,misconfig
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          skip-setup-trivy: true
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        id: gitleaks
+        shell: bash
+        run: |
+          set +e
+
+          config_args=()
+          if [ -f .gitleaks.toml ]; then
+            config_args=(--config .gitleaks.toml)
+          fi
+
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "${PWD}:/repo" \
+            -w /repo \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source . \
+            "${config_args[@]}" \
+            --report-format sarif \
+            --report-path gitleaks.sarif \
+            --redact \
+            --exit-code 1
+
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Show Gitleaks results in summary
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        run: python3 .github/scripts/sarif-summary.py gitleaks.sarif Gitleaks
+
+      - name: Upload Gitleaks SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Gitleaks SARIF to GitHub Code Scanning
+        if: always() && vars.ENABLE_GITHUB_CODE_SCANNING == 'true' && hashFiles('gitleaks.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+      - name: Apply Gitleaks gate
+        if: always()
+        shell: bash
+        run: |
+          status="${{ steps.gitleaks.outputs.exit_code }}"
+
+          if [ -z "$status" ]; then
+            echo "Gitleaks did not report an exit code."
+            exit 1
+          fi
+
+          if [ "$status" -ne 0 ]; then
+            echo "Gitleaks found secrets or exited with status $status."
+            exit "$status"
+          fi

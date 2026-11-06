@@ -1,0 +1,14 @@
+name: Nova CodeQL config
+
+disable-default-queries: false
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+paths-ignore:
+  - ".venv/**"
+  - ".pytest_cache/**"
+  - "NovaUI/static/vendor/**"
+  - "NovaUI/agent/binaries/**"
+  - "NovaUI/db.sqlite3"
