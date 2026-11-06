@@ -1,4 +1,17 @@
 services:
+  novaui:
+    image: novaui:local
+    build:
+      context: ../NovaUI
+      additional_contexts:
+        nova-supervisor: ../Nova-Supervisor
+      args:
+        NOVA_SUPERVISOR_VERSION: ${SUPERVISOR_VERSION:-latest}
+        NOVA_SUPERVISOR_COMMIT: ${SUPERVISOR_COMMIT:-unknown}
+  novacfg:
+    image: novacfg:local
+    build:
+      context: ../NovaCFG/main
   dragonfly:
     image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
     ulimits:
@@ -63,7 +76,6 @@ services:
       - "./grafana_data:/var/lib/grafana"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
 
 
 volumes:
