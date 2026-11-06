@@ -1,0 +1,19 @@
+services:
+  nova-supervisor-dind:
+    build:
+      context: ../..
+      dockerfile: local/dind/Dockerfile
+    privileged: true
+    cgroup: host
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - .:/usr/local/bin/local-dind
+      - ./alloy:/usr/local/bin/alloy:ro
+      - nova-supervisor-dind-graph:/var/lib/docker
+
+volumes:
+  nova-supervisor-dind-graph:
