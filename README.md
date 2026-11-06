@@ -2,6 +2,10 @@
 ## Repository layout
 The OSS conversion is ongoing; see [AI usage](ai-disclosure.md).
 
+### Current Goals
+The current goal for this project is to convert the existing code to a generic installer targeting kind and any standard 
+compliant kubernetes cluster
+
 ### Observability, Simplified. At Scale.
 Nova is a centralized, multi-tenant control plane for the Grafana LGTM observability stack. It simplifies the deployment, configuration, and lifecycle management of observability infrastructure, from agents to dashboards, through a single self-service interface.
 Built for scale, Nova eliminates the operational complexity of managing distributed observability deployments. Whether you're managing a handful of servers or thousands of agents across multiple tenants, Nova provides a consistent, automated, and centrally managed experience.
