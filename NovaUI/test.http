@@ -1,0 +1,81 @@
+GET localhost:3000/api/v1/sso-settings
+Authorization: Basic {{GRAFANA_BASIC_AUTH}}
+
+
+###
+GET localhost:3000/api/v1/sso-settings/generic_oauth
+Authorization: Basic {{GRAFANA_BASIC_AUTH}}
+
+
+###
+PUT localhost:3000/api/v1/sso-settings/generic_oauth
+Authorization: Basic {{GRAFANA_BASIC_AUTH}}
+Content-Type: application/json
+
+{
+  "id": "",
+  "settings": {
+    "allowAssignGrafanaAdmin": false,
+    "allowSignUp": true,
+    "allowedDomains": "[]",
+    "allowedGroups": "[]",
+    "allowedOrganizations": "[]",
+    "apiUrl": "http://host.docker.internal:8000/openid/userinfo",
+    "authStyle": "AutoDetect",
+    "authUrl": "http://host.docker.internal:8000/openid/authorize",
+    "autoLogin": true,
+    "clientAuthentication": "",
+    "clientId": "{{GRAFANA_OAUTH_CLIENT_ID}}",
+    "clientSecret": "{{GRAFANA_OAUTH_CLIENT_SECRET}}",
+    "defineAllowedGroups": false,
+    "defineAllowedTeamsIds": false,
+    "emailAttributeName": "email",
+    "emailAttributePath": "email",
+    "emptyScopes": false,
+    "enabled": true,
+    "federatedCredentialAudience": "",
+    "groupsAttributePath": "",
+    "hostedDomain": "",
+    "icon": "signin",
+    "idTokenAttributeName": "",
+    "loginAttributePath": "sub",
+    "loginPrompt": "",
+    "managedIdentityClientId": "",
+    "name": "OAuth",
+    "nameAttributePath": "name",
+    "roleAttributePath": "'Viewer'",
+    "roleAttributeStrict": true,
+    "scopes": "[\"openid\",\"profile\",\"email\",\"groups\",\"roles\"]",
+    "signoutRedirectUrl": "",
+    "skipOrgRoleSync": false,
+    "teamIds": "[]",
+    "teamIdsAttributePath": "",
+    "teamsUrl": "",
+    "tlsClientCa": "",
+    "tlsClientCert": "",
+    "tlsClientKey": "",
+    "tlsSkipVerifyInsecure": false,
+    "tokenUrl": "http://host.docker.internal:8000/openid/token",
+    "usePkce": false,
+    "useRefreshToken": true,
+    "workloadIdentityTokenFile": "",
+    "orgAttributePath": "groups",
+    "orgMapping": [
+      "nova-kDyVQeetHq-admin:16:Editor",
+      "nova-kDyVQeetHq-editor:16:Editor",
+      "nova-kDyVQeetHq-viewer:16:Viewer"
+    ]
+  }
+}
+
+
+### Get user by email
+GET localhost:3000/api/users/lookup?loginOrEmail=test@gmail.com
+Authorization: Basic {{GRAFANA_BASIC_AUTH}}
+
+
+### Logout user
+POST localhost:3000/api/admin/users/5/logout
+Authorization: Basic {{GRAFANA_BASIC_AUTH}}
+Accept: application/json
+Content-Type: application/json
