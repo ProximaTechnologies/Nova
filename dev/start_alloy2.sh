@@ -1,0 +1,1 @@
+./alloy run dev-cfg2.alloy --stability.level=experimental --server.http.listen-addr=0.0.0.0:12346

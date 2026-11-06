@@ -1,0 +1,18 @@
+livedebugging {
+  enabled = true
+}
+
+logging {
+  level="debug"
+}
+remotecfg {
+    url = "http://localhost:9080"
+    basic_auth {
+        username      = "8386e989c2c8448ea43b977361955190-config"
+        password      = "password"
+    }
+
+    id             = "8386e989c2c8448ea43b977361955190"
+    attributes     = {"cluster" = "dev", "namespace" = "otlp-dev", "tenant_id" = "test"}
+    poll_frequency = "10s"
+}
