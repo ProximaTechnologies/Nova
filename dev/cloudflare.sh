@@ -1,0 +1,1 @@
+cloudflared tunnel run --token "$(cat .CF_TOKEN)"
