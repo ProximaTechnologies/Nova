@@ -1,0 +1,101 @@
+name: NovaUI CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: NovaUI
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: NovaUI.settings
+      DEBUG: "True"
+      SECRET_KEY: ci-only-not-for-deployment-0123456789abcdefghijklmnopqrstuvwxyz
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports: [ "5432:5432" ]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: [ "6379:6379" ]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: NovaUI/requirements.txt
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
+          python -m pip install -r requirements.txt
+      - name: Check application, migrations, and static files
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+      - name: Run full test suite
+        run: python -m pytest -q --junitxml=test-results.xml
+      - name: Check production configuration
+        env:
+          DJANGO_SETTINGS_MODULE: NovaUI.settings_prod
+          DEBUG: "False"
+          ALLOWED_HOSTS: localhost,127.0.0.1,ui.example.test
+          CSRF_TRUSTED_ORIGINS: https://ui.example.test
+          UI_URL: https://ui.example.test
+          CONFIGURATION_URL: https://config.example.test
+          GRAFANA_HOST: grafana.example.test
+          GRAFANA_PROTOCOL: https
+          GRAFANA_USER: ci-user
+          GRAFANA_PASSWORD: ci-only-unused
+          NOVA_PUBLIC_URL: https://ui.example.test
+          NOVA_OIDC_ISSUER_URL: https://ui.example.test
+        run: python manage.py check --deploy --fail-level WARNING
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: novaui-test-results
+          path: NovaUI/test-results.xml
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Build from this checkout
+        env:
+          IMAGE_TAG: novaui:ci
+          SUPERVISOR_VERSION: 0.0.0-ci
+        run: bash scripts/build-image-with-supervisor.sh
+      - name: Verify bundled supervisor artifacts
+        run: |
+          docker run --rm --entrypoint sh novaui:ci -c '
+            set -eu
+            git --version
+            cd /app/agent/binaries
+            sha256sum -c SHA256SUMS
+            for arch in amd64 arm64 ppc64le s390x; do
+              test -f "nova-supervisor-0.0.0-ci-linux-${arch}"
+            done
+          '
