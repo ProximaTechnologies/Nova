@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: forgejo-nova
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: forgejo-nova-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "50"
+      labels:
+        app.kubernetes.io/name: forgejo-nova
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      source:
+        repoURL: http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+        targetRevision: main
+        path: .
+        directory:
+          recurse: true
+      destination:
+        name: "{{cluster}}"
+        namespace: nova
+      syncPolicy:
+        automated:
+          prune: true
+        retry:
+          limit: 12
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - CreateNamespace=true

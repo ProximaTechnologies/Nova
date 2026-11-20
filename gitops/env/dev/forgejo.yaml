@@ -1,0 +1,228 @@
+ingress:
+  enabled: true
+  className: apisix
+  hosts:
+    - host: forgejo.domain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: http
+  tls: []
+
+novaWebhook:
+  argoCDURL: http://argocd-server.argocd.svc.cluster.local/api/webhook
+  branch: main
+  repoOwner: nova
+  repoName: nova
+  secret: local-dev-forgejo-nova-webhook-secret
+
+gitea:
+  admin:
+    existingSecret: forgejo-admin
+    username: gitea_admin
+    password: local-dev-forgejo-admin-password
+  config:
+    webhook:
+      ALLOWED_HOST_LIST: external,private
+
+extraDeploy:
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: forgejo-admin
+      namespace: forgejo
+      annotations:
+        replicator.v1.mittwald.de/replicate-to: "nova"
+    type: Opaque
+    stringData:
+      username: {{ .Values.gitea.admin.username | quote }}
+      password: {{ .Values.gitea.admin.password | quote }}
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: forgejo-nova-repository
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    type: Opaque
+    stringData:
+      name: forgejo-nova
+      project: nova-dev
+      type: git
+      url: http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+      username: {{ .Values.gitea.admin.username | quote }}
+      password: {{ .Values.gitea.admin.password | quote }}
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: forgejo-nova-webhook
+      namespace: forgejo
+    type: Opaque
+    stringData:
+      secret: {{ .Values.novaWebhook.secret | quote }}
+  - |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: forgejo-nova-webhook-bootstrap
+      namespace: forgejo
+      annotations:
+        argocd.argoproj.io/hook: PostSync
+        argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    spec:
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: forgejo-nova-webhook-bootstrap
+            app.kubernetes.io/part-of: nova
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: bootstrap
+              image: python:3.13-alpine
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: FORGEJO_URL
+                  value: http://forgejo-http.forgejo.svc.cluster.local:3000
+                - name: FORGEJO_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: forgejo-admin
+                      key: username
+                - name: FORGEJO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: forgejo-admin
+                      key: password
+                - name: WEBHOOK_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: forgejo-nova-webhook
+                      key: secret
+                - name: WEBHOOK_URL
+                  value: {{ .Values.novaWebhook.argoCDURL | quote }}
+                - name: REPO_OWNER
+                  value: {{ .Values.novaWebhook.repoOwner | quote }}
+                - name: REPO_NAME
+                  value: {{ .Values.novaWebhook.repoName | quote }}
+                - name: BRANCH
+                  value: {{ .Values.novaWebhook.branch | quote }}
+                - name: WAIT_SECONDS
+                  value: "1800"
+              command:
+                - python
+                - -c
+                - |
+                  import base64
+                  import json
+                  import os
+                  import sys
+                  import time
+                  import urllib.error
+                  import urllib.request
+
+                  base_url = os.environ["FORGEJO_URL"].rstrip("/")
+                  username = os.environ["FORGEJO_USERNAME"]
+                  password = os.environ["FORGEJO_PASSWORD"]
+                  owner = os.environ["REPO_OWNER"]
+                  repo = os.environ["REPO_NAME"]
+                  webhook_url = os.environ["WEBHOOK_URL"]
+                  webhook_secret = os.environ["WEBHOOK_SECRET"]
+                  branch = os.environ["BRANCH"]
+                  wait_seconds = int(os.environ.get("WAIT_SECONDS", "1800"))
+
+                  token = base64.b64encode(f"{username}:{password}".encode()).decode()
+                  headers = {
+                      "Accept": "application/json",
+                      "Authorization": f"Basic {token}",
+                      "Content-Type": "application/json",
+                  }
+
+                  def request(method, path, payload=None):
+                      data = None
+                      if payload is not None:
+                          data = json.dumps(payload).encode()
+                      req = urllib.request.Request(
+                          f"{base_url}{path}",
+                          data=data,
+                          headers=headers,
+                          method=method,
+                      )
+                      try:
+                          with urllib.request.urlopen(req, timeout=10) as response:
+                              body = response.read().decode()
+                              return response.status, body
+                      except urllib.error.HTTPError as exc:
+                          return exc.code, exc.read().decode()
+                      except urllib.error.URLError as exc:
+                          return 0, str(exc)
+
+                  deadline = time.time() + wait_seconds
+                  repo_path = f"/api/v1/repos/{owner}/{repo}"
+                  while time.time() < deadline:
+                      status, body = request("GET", repo_path)
+                      if status == 200:
+                          print(f"Repository {owner}/{repo} is available.")
+                          break
+                      print(f"Waiting for repository {owner}/{repo}; last status={status} body={body[:200]}")
+                      time.sleep(10)
+                  else:
+                      print(f"Timed out waiting for repository {owner}/{repo}.", file=sys.stderr)
+                      sys.exit(1)
+
+                  hook_payload = {
+                      "type": "gogs",
+                      "config": {
+                          "url": webhook_url,
+                          "content_type": "json",
+                          "http_method": "post",
+                          "secret": webhook_secret,
+                      },
+                      "events": ["push"],
+                      "branch_filter": branch,
+                      "active": True,
+                  }
+                  edit_payload = {
+                      "config": hook_payload["config"],
+                      "events": hook_payload["events"],
+                      "branch_filter": hook_payload["branch_filter"],
+                      "active": hook_payload["active"],
+                  }
+
+                  hooks_path = f"{repo_path}/hooks"
+                  status, body = request("GET", hooks_path)
+                  if status != 200:
+                      print(f"Failed to list hooks: status={status} body={body}", file=sys.stderr)
+                      sys.exit(1)
+
+                  hooks = json.loads(body or "[]")
+                  existing = next(
+                      (
+                          hook
+                          for hook in hooks
+                          if hook.get("type") == "gogs"
+                          and hook.get("config", {}).get("url") == webhook_url
+                      ),
+                      None,
+                  )
+
+                  if existing:
+                      hook_id = existing["id"]
+                      status, body = request("PATCH", f"{hooks_path}/{hook_id}", edit_payload)
+                      action = "updated"
+                  else:
+                      status, body = request("POST", hooks_path, hook_payload)
+                      action = "created"
+
+                  if status not in (200, 201):
+                      print(f"Failed to ensure webhook: status={status} body={body}", file=sys.stderr)
+                      sys.exit(1)
+
+                  print(f"Forgejo Gogs webhook {action} for {owner}/{repo}.")

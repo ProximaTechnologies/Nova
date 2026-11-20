@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apisix
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: apisix-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      labels:
+        app.kubernetes.io/name: apisix
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://apache.github.io/apisix-helm-chart
+          chart: apisix
+          targetRevision: 2.14.1
+          helm:
+            releaseName: apisix
+            valueFiles:
+              - $values/gitops/env/{{env}}/apisix.yaml
+            parameters:
+              - name: ingress-controller.enabled
+                value: "true"
+              - name: ingress-controller.gatewayProxy.createDefault
+                value: "true"
+              - name: ingress-controller.gatewayProxy.provider.controlPlane.service.name
+                value: apisix-admin
+              - name: ingress-controller.gatewayProxy.provider.controlPlane.service.port
+                value: "9180"
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: "{{cluster}}"
+        namespace: apisix
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true

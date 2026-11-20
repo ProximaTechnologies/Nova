@@ -1,4 +1,6 @@
 # Nova
+See [Installation](Installation.md) for the Argo CD infrastructure bootstrap on kind or an existing Kubernetes cluster.
+
 ## Repository layout
 The OSS conversion is ongoing; see [AI usage](ai-disclosure.md).
 

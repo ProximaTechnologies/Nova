@@ -1,0 +1,250 @@
+ingress:
+  host: nova.proxima-technologies.com
+  ingressClassName: apisix
+
+cfg:
+  image:
+    imagePullPolicy: IfNotPresent
+  env:
+    - name: REDIS_URL
+      value: "dragonfly-ha.dragonfly-prod.svc.cluster.local:6379"
+    - name: NOVAUI_URL
+      value: "http://nova-ui-nova-service.nova.svc.cluster.local"
+    - name: NOVAUI_CONFIG_REFRESH_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: nova-ui-runtime
+          key: NOVACFG_CONFIG_REFRESH_TOKEN
+    - name: MIMIR_URL
+      value: "https://mimir.proxima-technologies.com/api/v1/push"
+    - name: LOKI_URL
+      value: "https://loki.proxima-technologies.com/loki/api/v1/push"
+    - name: NO_TLS_VERIFY
+      value: "false"
+
+postgres:
+  name: nova-db
+  certManager:
+    enabled: false
+
+ui:
+  image:
+    imagePullPolicy: IfNotPresent
+  env:
+    - name: DJANGO_SETTINGS_MODULE
+      value: NovaUI.settings
+    - name: NOVA_ENV
+      value: "production"
+    - name: DEBUG
+      value: "false"
+    - name: SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: nova-ui-runtime
+          key: SECRET_KEY
+    - name: ALLOWED_HOSTS
+      value: "nova.proxima-technologies.com,nova-ui-nova-service,nova-ui-nova-service.nova.svc,nova-ui-nova-service.nova.svc.cluster.local,localhost,127.0.0.1"
+    - name: CSRF_TRUSTED_ORIGINS
+      value: "https://nova.proxima-technologies.com"
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: nova-ui-runtime
+          key: DATABASE_URL
+    - name: REDIS_URL
+      value: "redis://dragonfly-ha.dragonfly-prod.svc.cluster.local:6379/0"
+    - name: CONFIGURATION_URL
+      value: "https://cfg.proxima-technologies.com"
+    - name: UI_URL
+      value: "https://nova.proxima-technologies.com"
+    - name: NOVACFG_CONFIG_REFRESH_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: nova-ui-runtime
+          key: NOVACFG_CONFIG_REFRESH_TOKEN
+    - name: GRAFANA_PROTOCOL
+      value: "http"
+    - name: GRAFANA_HOST
+      value: "nova-grafana-service.nova.svc.cluster.local:3000"
+    - name: GRAFANA_EXTERNAL_URL
+      value: "https://grafana.proxima-technologies.com"
+    - name: GRAFANA_USER
+      valueFrom:
+        secretKeyRef:
+          name: grafana-admin-credentials
+          key: GF_SECURITY_ADMIN_USER
+    - name: GRAFANA_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: grafana-admin-credentials
+          key: GF_SECURITY_ADMIN_PASSWORD
+    - name: GRAFANA_OAUTH_CLIENT_NAME
+      value: "Grafana OAuth"
+    - name: GRAFANA_OAUTH_TLS_SKIP_VERIFY_INSECURE
+      value: "false"
+    - name: NOVA_PUBLIC_URL
+      value: "https://nova.proxima-technologies.com"
+    - name: NOVA_OIDC_ISSUER_URL
+      value: "https://nova.proxima-technologies.com"
+    - name: NODE_TOKEN_TTL_MINUTES
+      value: "10"
+    - name: DASHBOARD_WEBSOCKET_REFRESH_SECONDS
+      value: "5"
+    - name: CELERY_BROKER_URL
+      value: "redis://dragonfly-ha.dragonfly-prod.svc.cluster.local:6379/0"
+    - name: CELERY_BACKEND
+      value: "redis://dragonfly-ha.dragonfly-prod.svc.cluster.local:6379/0"
+    - name: DEFAULT_FROM_EMAIL
+      value: "Nova <noreply@nova.proxima-technologies.com>"
+    - name: GITOPS_REPO_PATH
+      value: ""
+    - name: GITOPS_MANIFEST_ROOT
+      value: "novaui"
+    - name: GITOPS_AUTO_COMMIT
+      value: "true"
+    - name: GITOPS_AUTO_PUSH
+      value: "true"
+    - name: GITOPS_COMMIT_AUTHOR_NAME
+      value: "NovaUI"
+    - name: GITOPS_COMMIT_AUTHOR_EMAIL
+      value: "novaui@proxima-technologies.com"
+    - name: GITOPS_PLUGINS
+      value: "config.gitops.plugins.grafana.GrafanaOperatorPlugin,config.gitops.plugins.apisix.APISIXPlugin"
+    - name: GITOPS_GRAFANA_NAMESPACE
+      value: "nova"
+    - name: GITOPS_GRAFANA_INSTANCE_LABEL_KEY
+      value: "dashboards"
+    - name: GITOPS_GRAFANA_ADMIN_SECRET_NAME
+      value: "grafana-admin-credentials"
+    - name: GITOPS_GRAFANA_ADMIN_USER_KEY
+      value: "GF_SECURITY_ADMIN_USER"
+    - name: GITOPS_GRAFANA_ADMIN_PASSWORD_KEY
+      value: "GF_SECURITY_ADMIN_PASSWORD"
+    - name: GITOPS_GRAFANA_RESYNC_PERIOD
+      value: "10m"
+    - name: GITOPS_MIMIR_DATASOURCE_URL
+      value: "http://mimir-gateway.mimir.svc/prometheus"
+    - name: GITOPS_LOKI_DATASOURCE_URL
+      value: "http://loki-gateway.loki.svc"
+    - name: GITOPS_APISIX_NAMESPACE
+      value: "apisix"
+    - name: GITOPS_APISIX_INGRESS_CLASS
+      value: "apisix"
+    - name: GITOPS_KUBESEAL_BINARY
+      value: "/usr/local/bin/kubeseal"
+    - name: GITOPS_SEALED_SECRETS_CERT_FILE
+      value: "/tmp/sealed-secrets-public.pem"
+    - name: GITOPS_SEALED_SECRETS_CERT_URL
+      value: "http://sealed-secrets-controller.sealed-secrets.svc:8080/v1/cert.pem"
+    - name: GITOPS_SEALED_SECRETS_SCOPE
+      value: "strict"
+    - name: GITOPS_FORGEJO_ENABLED
+      value: "true"
+    - name: GITOPS_FORGEJO_URL
+      value: "http://forgejo-http.forgejo.svc.cluster.local:3000"
+    - name: GITOPS_FORGEJO_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: forgejo-admin
+          key: username
+    - name: GITOPS_FORGEJO_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: forgejo-admin
+          key: password
+    - name: GITOPS_FORGEJO_ORG
+      value: "nova"
+    - name: GITOPS_FORGEJO_DEFAULT_BRANCH
+      value: "main"
+    - name: GITOPS_FORGEJO_REPO_PRIVATE
+      value: "true"
+    - name: GITOPS_FORGEJO_TIMEOUT_SECONDS
+      value: "10"
+    - name: GITOPS_FORGEJO_SSL_VERIFY
+      value: "true"
+    - name: GITOPS_FORGEJO_NOVA_REPO_NAME
+      value: "nova"
+    - name: GITOPS_FORGEJO_CUSTOM_REPO_SUFFIX
+      value: "custom"
+
+dragonfly:
+  storageClass: "standard"
+  storage: "1Gi"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  auth:
+    enabled: false
+  tls:
+    enabled: false
+
+grafana:
+  config:
+    auth.generic_oauth:
+      tls_skip_verify_insecure: "false"
+
+apisixRoute:
+  enabled: true
+  tls:
+    enabled: true
+    secretName: "proxima-technologies-com-wildcard-tls"
+    secretNamespace: "nova"
+  ui:
+    enabled: true
+    host: "nova.proxima-technologies.com"
+    tls:
+      enabled: true
+    paths:
+      - "/*"
+    websocket:
+      enabled: true
+      paths:
+        - "/ws/*"
+      priority: 10
+  cfg:
+    enabled: true
+    host: "cfg.proxima-technologies.com"
+    tls:
+      enabled: true
+    paths:
+      - "/*"
+  mimir:
+    enabled: true
+    host: "mimir.proxima-technologies.com"
+    tls:
+      enabled: true
+    paths:
+      - "/*"
+    serviceName: "nova-mimir-gateway"
+    servicePort: 80
+    externalName: "mimir-gateway.mimir.svc.cluster.local"
+    pluginConfig:
+      name: "nova-mimir-auth"
+      namespace: "apisix"
+  loki:
+    enabled: true
+    host: "loki.proxima-technologies.com"
+    tls:
+      enabled: true
+    paths:
+      - "/*"
+    serviceName: "nova-loki-gateway"
+    servicePort: 80
+    externalName: "loki-gateway.loki.svc.cluster.local"
+    pluginConfig:
+      name: "nova-loki-auth"
+      namespace: "apisix"
+  grafana:
+    enabled: true
+    host: "grafana.proxima-technologies.com"
+    tls:
+      enabled: true
+    paths:
+      - "/*"
+    serviceName: "nova-grafana-service"
+    servicePort: 3000

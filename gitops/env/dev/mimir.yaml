@@ -1,0 +1,65 @@
+gateway:
+  ingress:
+    enabled: false
+    ingressClassName: apisix
+    hosts:
+      - host: mimir.domain.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+alertmanager:
+  persistentVolume:
+    enabled: false
+
+compactor:
+  persistentVolume:
+    enabled: false
+
+distributor:
+  replicas: 1
+
+ingester:
+  replicas: 1
+  persistentVolume:
+    enabled: false
+  zoneAwareReplication:
+    enabled: false
+
+kafka:
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+
+minio:
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+overrides_exporter:
+  enabled: false
+
+querier:
+  replicas: 1
+
+query_scheduler:
+  replicas: 1
+
+rollout_operator:
+  enabled: false
+
+ruler:
+  enabled: false
+
+store_gateway:
+  persistentVolume:
+    enabled: false
+  zoneAwareReplication:
+    enabled: false

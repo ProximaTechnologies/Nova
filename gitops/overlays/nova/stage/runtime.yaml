@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nova
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+  labels:
+    access.dragonflydb.io/allow: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-db-app
+  namespace: nova
+type: Opaque
+stringData:
+  username: nova
+  password: REPLACEME_STAGE_NOVA_DB_PASSWORD
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-ui-runtime
+  namespace: nova
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+type: Opaque
+stringData:
+  SECRET_KEY: REPLACEME_STAGE_NOVA_SECRET_KEY
+  DATABASE_URL: postgres://nova:REPLACEME_STAGE_NOVA_DB_PASSWORD@nova-db-rw.nova.svc.cluster.local:5432/nova
+  NOVACFG_CONFIG_REFRESH_TOKEN: REPLACEME_STAGE_NOVACFG_CONFIG_REFRESH_TOKEN
+  GRAFANA_OAUTH_CLIENT_ID: nova-ui
+  GRAFANA_OAUTH_CLIENT_SECRET: REPLACEME_STAGE_GRAFANA_OAUTH_CLIENT_SECRET
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin-credentials
+  namespace: nova
+type: Opaque
+stringData:
+  GF_SECURITY_ADMIN_USER: admin
+  GF_SECURITY_ADMIN_PASSWORD: REPLACEME_STAGE_GRAFANA_ADMIN_PASSWORD

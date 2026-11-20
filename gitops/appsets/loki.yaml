@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: loki-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      labels:
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://grafana-community.github.io/helm-charts
+          chart: loki
+          targetRevision: 17.1.1
+          helm:
+            releaseName: loki
+            valueFiles:
+              - $values/gitops/env/{{env}}/loki.yaml
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: "{{cluster}}"
+        namespace: loki
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true

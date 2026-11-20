@@ -1,0 +1,72 @@
+crds:
+  enabled: true
+  keep: true
+
+clusterResourceNamespace: cert-manager
+
+extraObjects:
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: domain-com-selfsigned
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+    spec:
+      selfSigned: {}
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: domain-com-root-ca
+      namespace: cert-manager
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+    spec:
+      isCA: true
+      commonName: domain.com root CA
+      secretName: domain-com-root-ca
+      secretTemplate:
+        annotations:
+          replicator.v1.mittwald.de/replicate-to: "nova"
+      privateKey:
+        algorithm: ECDSA
+        size: 256
+      issuerRef:
+        name: domain-com-selfsigned
+        kind: ClusterIssuer
+        group: cert-manager.io
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: domain-com-ca
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+    spec:
+      ca:
+        secretName: domain-com-root-ca
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: domain-com-wildcard
+      namespace: cert-manager
+      annotations:
+        argocd.argoproj.io/sync-wave: "40"
+    spec:
+      secretName: domain-com-wildcard-tls
+      secretTemplate:
+        annotations:
+          replicator.v1.mittwald.de/replicate-to: "nova"
+      commonName: "*.domain.com"
+      dnsNames:
+        - domain.com
+        - "*.domain.com"
+      privateKey:
+        algorithm: ECDSA
+        size: 256
+      issuerRef:
+        name: domain-com-ca
+        kind: ClusterIssuer
+        group: cert-manager.io

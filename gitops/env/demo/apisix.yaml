@@ -1,0 +1,25 @@
+ingress:
+  enabled: false
+  className: apisix
+  hosts:
+    - host: apisix.domain.com
+      paths:
+        - /
+  tls: []
+service:
+  type: NodePort
+  http:
+    nodePort: 30080
+  tls:
+    nodePort: 30443
+  stream:
+    enabled: true
+apisix:
+  ssl:
+    enabled: true
+etcd:
+  preUpgradeJob:
+    enabled: false
+  auth:
+    token:
+      enabled: false

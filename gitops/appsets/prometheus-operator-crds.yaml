@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: prometheus-operator-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: prometheus-operator-crds-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+      labels:
+        app.kubernetes.io/name: prometheus-operator-crds
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: prometheus-operator-crds
+          targetRevision: 29.0.0
+          helm:
+            releaseName: prometheus-operator-crds
+            valueFiles:
+              - $values/gitops/env/{{env}}/prometheus-operator-crds.yaml
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: "{{cluster}}"
+        namespace: prometheus-operator-crds
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: githubtoken
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: Nova-GitOps
+  type: git
+  url: https://github.com/ProximaTechnologies/Nova.git
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: novacharts
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: NovaCharts
+  type: git
+  url: https://github.com/ProximaTechnologies/NovaCharts

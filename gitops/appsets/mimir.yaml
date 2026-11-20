@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: mimir
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: mimir-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      labels:
+        app.kubernetes.io/name: mimir
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://grafana.github.io/helm-charts
+          chart: mimir-distributed
+          targetRevision: 6.0.6
+          helm:
+            releaseName: mimir
+            valueFiles:
+              - $values/gitops/env/{{env}}/mimir.yaml
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: "{{cluster}}"
+        namespace: mimir
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true

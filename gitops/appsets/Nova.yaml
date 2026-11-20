@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nova
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: nova-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "40"
+      labels:
+        app.kubernetes.io/name: nova
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://github.com/ProximaTechnologies/NovaCharts
+          path: Nova
+          helm:
+            releaseName: nova
+            valueFiles:
+              - $values/gitops/env/{{env}}/Nova.yaml
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          path: gitops/overlays/nova/{{env}}
+      destination:
+        name: "{{cluster}}"
+        namespace: nova
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 12
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - CreateNamespace=true

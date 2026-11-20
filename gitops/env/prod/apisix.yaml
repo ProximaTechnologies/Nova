@@ -1,0 +1,17 @@
+ingress:
+  enabled: false
+  className: apisix
+  hosts:
+    - host: apisix.proxima-technologies.com
+      paths:
+        - /
+  tls: []
+service:
+  stream:
+    enabled: true
+etcd:
+  preUpgradeJob:
+    enabled: false
+  auth:
+    token:
+      enabled: false

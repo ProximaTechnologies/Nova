@@ -1,0 +1,51 @@
+ingress:
+  enabled: true
+  className: apisix
+  hosts:
+    - host: forgejo.staging.proxima-technologies.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: http
+  tls:
+    - secretName: staging-proxima-technologies-com-wildcard-tls
+      hosts:
+        - forgejo.staging.proxima-technologies.com
+
+gitea:
+  admin:
+    existingSecret: forgejo-admin
+    username: gitea_admin
+    password: REPLACEME_STAGE_FORGEJO_ADMIN_PASSWORD
+
+extraDeploy:
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: forgejo-admin
+      namespace: forgejo
+      annotations:
+        replicator.v1.mittwald.de/replicate-to: "nova"
+    type: Opaque
+    stringData:
+      username: {{ .Values.gitea.admin.username | quote }}
+      password: {{ .Values.gitea.admin.password | quote }}
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: forgejo-nova-repository
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    type: Opaque
+    stringData:
+      name: forgejo-nova-stage
+      project: nova-stage
+      type: git
+      url: http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+      username: {{ .Values.gitea.admin.username | quote }}
+      password: {{ .Values.gitea.admin.password | quote }}

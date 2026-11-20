@@ -1,0 +1,6 @@
+- add encrypted in cluster communication eg cilium or sth
+- hubble for cilium
+- setup network rules
+- velero
+- vault
+- hardening with network policies

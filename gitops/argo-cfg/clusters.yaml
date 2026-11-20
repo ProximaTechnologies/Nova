@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-dev
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    nova.proxima.dev/environment: dev
+type: Opaque
+stringData:
+  name: dev
+  server: https://kubernetes.default.svc
+  config: |
+    {
+      "tlsClientConfig": {
+        "insecure": false
+      }
+    }

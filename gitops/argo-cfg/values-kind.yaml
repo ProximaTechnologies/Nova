@@ -1,0 +1,23 @@
+global:
+  addPrometheusAnnotations: true
+
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: apisix
+    hostname: argocd.domain.com
+
+configs:
+  cm:
+    webhook.maxPayloadSizeMB: "1"
+    resource.customizations.health.networking.k8s.io_Ingress: |
+      hs = {}
+      hs.status = "Healthy"
+      hs.message = "Ingress loadBalancer status is ignored for local kind/APISIX bootstrap."
+      return hs
+  params:
+    server.insecure: true
+  secret:
+    gogsSecret: local-dev-forgejo-nova-webhook-secret

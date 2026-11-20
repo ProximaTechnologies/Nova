@@ -1,0 +1,12 @@
+# Existing-cluster bootstrap: access Argo CD via port-forward until ingress is configured.
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+configs:
+  params:
+    server.insecure: true
+  secret:
+    # Must match env/dev/forgejo.yaml for the included development profile.
+    gogsSecret: local-dev-forgejo-nova-webhook-secret

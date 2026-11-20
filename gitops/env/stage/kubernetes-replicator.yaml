@@ -1,0 +1,10 @@
+args:
+  - --allow-all=true
+  - --sync-by-content
+
+replicationEnabled:
+  secrets: true
+  configMaps: false
+  roles: false
+  roleBindings: false
+  serviceAccounts: false

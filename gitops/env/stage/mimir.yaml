@@ -1,0 +1,10 @@
+gateway:
+  ingress:
+    enabled: false
+    ingressClassName: apisix
+    hosts:
+      - host: mimir.staging.proxima-technologies.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []

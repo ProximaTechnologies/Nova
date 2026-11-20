@@ -1,0 +1,110 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nova-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  description: Nova dev environment applications
+  sourceRepos:
+    - https://github.com/ProximaTechnologies/Nova.git
+    - https://github.com/ProximaTechnologies/NovaCharts
+    - https://apache.github.io/apisix-helm-chart
+    - https://bitnami.github.io/sealed-secrets
+    - https://cloudnative-pg.github.io/charts
+    - https://charts.jetstack.io
+    - ghcr.io/dragonflydb/dragonfly-operator/helm
+    - code.forgejo.org/forgejo-helm
+    - http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+    - ghcr.io/grafana/helm-charts
+    - https://grafana-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://helm.mittwald.de
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - name: dev
+      namespace: '*'
+    # Local kind aliases share this in-cluster API server.
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nova-stage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  description: Nova stage environment applications
+  sourceRepos:
+    - https://github.com/ProximaTechnologies/Nova.git
+    - https://github.com/ProximaTechnologies/NovaCharts
+    - https://apache.github.io/apisix-helm-chart
+    - https://bitnami.github.io/sealed-secrets
+    - https://cloudnative-pg.github.io/charts
+    - https://charts.jetstack.io
+    - ghcr.io/dragonflydb/dragonfly-operator/helm
+    - code.forgejo.org/forgejo-helm
+    - http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+    - ghcr.io/grafana/helm-charts
+    - https://grafana-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://helm.mittwald.de
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - name: stage
+      namespace: '*'
+    # Local kind aliases share this in-cluster API server.
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nova-prod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  description: Nova prod environment applications
+  sourceRepos:
+    - https://github.com/ProximaTechnologies/Nova.git
+    - https://github.com/ProximaTechnologies/NovaCharts
+    - https://apache.github.io/apisix-helm-chart
+    - https://bitnami.github.io/sealed-secrets
+    - https://cloudnative-pg.github.io/charts
+    - https://charts.jetstack.io
+    - ghcr.io/dragonflydb/dragonfly-operator/helm
+    - code.forgejo.org/forgejo-helm
+    - http://forgejo-http.forgejo.svc.cluster.local:3000/nova/nova.git
+    - ghcr.io/grafana/helm-charts
+    - https://grafana-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://helm.mittwald.de
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - name: prod
+      namespace: '*'
+    # Local kind aliases share this in-cluster API server.
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

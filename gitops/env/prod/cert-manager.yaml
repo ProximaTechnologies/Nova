@@ -1,0 +1,60 @@
+crds:
+  enabled: true
+  keep: true
+
+clusterResourceNamespace: cert-manager
+
+extraObjects:
+  - |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: cloudflare-api-token
+      namespace: cert-manager
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+    type: Opaque
+    stringData:
+      api-token: REPLACEME_PROD_CLOUDFLARE_TOKEN
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: proxima-technologies-com-letsencrypt
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+    spec:
+      acme:
+        server: https://acme-v02.api.letsencrypt.org/directory
+        privateKeySecretRef:
+          name: proxima-technologies-com-letsencrypt-account-key
+        solvers:
+          - dns01:
+              cloudflare:
+                apiTokenSecretRef:
+                  name: cloudflare-api-token
+                  key: api-token
+  - |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: proxima-technologies-com-wildcard
+      namespace: cert-manager
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+    spec:
+      secretName: proxima-technologies-com-wildcard-tls
+      secretTemplate:
+        annotations:
+          replicator.v1.mittwald.de/replicate-to: "nova,forgejo"
+      commonName: "*.proxima-technologies.com"
+      dnsNames:
+        - proxima-technologies.com
+        - "*.proxima-technologies.com"
+      privateKey:
+        algorithm: ECDSA
+        size: 256
+      issuerRef:
+        name: proxima-technologies-com-letsencrypt
+        kind: ClusterIssuer
+        group: cert-manager.io

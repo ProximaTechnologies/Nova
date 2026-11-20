@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nova
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+  labels:
+    access.dragonflydb.io/allow: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-db-app
+  namespace: nova
+type: Opaque
+stringData:
+  username: nova
+  password: nova-local-password
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nova-ui-runtime
+  namespace: nova
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+type: Opaque
+stringData:
+  SECRET_KEY: local-dev-only-change-before-prod-lSKxAe24VE3ABjiKE4x26vjqJ8iOeTwz
+  DATABASE_URL: postgres://nova:nova-local-password@nova-db-rw.nova.svc.cluster.local:5432/nova
+  NOVACFG_CONFIG_REFRESH_TOKEN: local-dev-novacfg-config-refresh-token
+  GRAFANA_OAUTH_CLIENT_ID: nova-ui
+  GRAFANA_OAUTH_CLIENT_SECRET: local-dev-grafana-oauth-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin-credentials
+  namespace: nova
+type: Opaque
+stringData:
+  GF_SECURITY_ADMIN_USER: admin
+  GF_SECURITY_ADMIN_PASSWORD: admin
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs
+  namespace: nova
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seaweedfs
+  template:
+    metadata:
+      labels:
+        app: seaweedfs
+    spec:
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:latest
+          ports:
+            - name: s3
+              containerPort: 8333
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: test
+            - name: AWS_SECRET_ACCESS_KEY
+              value: test
+            - name: S3_BUCKET
+              value: my-bucket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs
+  namespace: nova
+spec:
+  selector:
+    app: seaweedfs
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: s3

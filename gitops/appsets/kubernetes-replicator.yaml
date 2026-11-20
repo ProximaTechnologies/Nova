@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kubernetes-replicator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev
+            project: nova-dev
+  template:
+    metadata:
+      name: kubernetes-replicator-{{env}}
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+      labels:
+        app.kubernetes.io/name: kubernetes-replicator
+        app.kubernetes.io/part-of: nova
+        nova.proxima.dev/environment: "{{env}}"
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://helm.mittwald.de
+          chart: kubernetes-replicator
+          targetRevision: 2.12.3
+          helm:
+            releaseName: kubernetes-replicator
+            valueFiles:
+              - $values/gitops/env/{{env}}/kubernetes-replicator.yaml
+        - repoURL: https://github.com/ProximaTechnologies/Nova.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: "{{cluster}}"
+        namespace: kubernetes-replicator
+      syncPolicy:
+        automated: {}
+        syncOptions:
+          - CreateNamespace=true
