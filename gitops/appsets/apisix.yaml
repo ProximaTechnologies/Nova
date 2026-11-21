@@ -40,8 +40,8 @@ spec:
                 value: apisix-admin
               - name: ingress-controller.gatewayProxy.provider.controlPlane.service.port
                 value: "9180"
-        - repoURL: https://github.com/ProximaTechnologies/Nova.git
-          targetRevision: main
+        - repoURL: "https://github.com/ProximaTechnologies/Nova.git"
+          targetRevision: "codex/oci-bootstrap-test-20261121"
           ref: values
       destination:
         name: "{{cluster}}"

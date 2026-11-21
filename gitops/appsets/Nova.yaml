@@ -24,17 +24,18 @@ spec:
     spec:
       project: "{{project}}"
       sources:
-        - repoURL: https://github.com/ProximaTechnologies/NovaCharts
-          path: Nova
+        - repoURL: ghcr.io/proximatechnologies/novacharts
+          chart: nova
+          targetRevision: 0.1.0
           helm:
             releaseName: nova
             valueFiles:
               - $values/gitops/env/{{env}}/Nova.yaml
-        - repoURL: https://github.com/ProximaTechnologies/Nova.git
-          targetRevision: main
+        - repoURL: "https://github.com/ProximaTechnologies/Nova.git"
+          targetRevision: "codex/oci-bootstrap-test-20261121"
           ref: values
-        - repoURL: https://github.com/ProximaTechnologies/Nova.git
-          targetRevision: main
+        - repoURL: "https://github.com/ProximaTechnologies/Nova.git"
+          targetRevision: "codex/oci-bootstrap-test-20261121"
           path: gitops/overlays/nova/{{env}}
       destination:
         name: "{{cluster}}"

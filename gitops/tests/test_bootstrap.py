@@ -14,12 +14,20 @@ class BootstrapTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name)
         self.log = self.directory / 'commands'
-        for name in ('kubectl', 'helm', 'kind'):
+        for name in ('kubectl', 'helm', 'kind', 'docker'):
             command = self.directory / name
             command.write_text('''#!/usr/bin/env bash
 printf '%s\\n' "$(basename "$0") $*" >> "$COMMAND_LOG"
 if [[ "$*" == 'config get-contexts -o name' ]]; then printf 'test-cluster\\nkind-argo\\n'; fi
-if [[ "$*" == 'get clusters' ]]; then echo argo; fi
+if [[ "$*" == 'get clusters' ]]; then
+  [[ "${FAIL_CLUSTERS:-false}" != true ]] || exit 1
+  echo "${FAKE_CLUSTERS-argo}"
+fi
+if [[ "$(basename "$0") $*" == 'docker info' && "${FAIL_DOCKER:-false}" == true ]]; then exit 1; fi
+if [[ "$*" == 'get nodes --name argo' ]]; then echo argo-control-plane; fi
+if [[ "$*" == 'exec argo-control-plane uname -m' ]]; then echo aarch64; fi
+if [[ "$*" == *'Corefile}'* ]]; then printf '.:53 {\\n    kubernetes cluster.local\\n}\\n'; fi
+if [[ "$*" == *'images import'* ]]; then cat >/dev/null; fi
 if [[ "$*" == *'apply -f -'* ]]; then cat > "$SECRET_CAPTURE"; fi
 ''')
             command.chmod(0o755)
@@ -68,6 +76,25 @@ if [[ "$*" == *'apply -f -'* ]]; then cat > "$SECRET_CAPTURE"; fi
         self.assertEqual(result.returncode, 2)
         self.assertNotIn('delete cluster', self.log.read_text())
         self.assertNotIn('create cluster', self.log.read_text())
+
+    def test_create_stops_when_cluster_listing_fails(self):
+        result = self.run_script('create-kind.sh', FAIL_CLUSTERS='true')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('kind create cluster', self.log.read_text())
+
+    def test_create_stops_when_docker_is_unavailable(self):
+        result = self.run_script('create-kind.sh', FAIL_DOCKER='true')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('kind create cluster', self.log.read_text())
+
+    def test_local_images_load_before_install(self):
+        result = self.run_script('create-kind.sh', FAKE_CLUSTERS='',
+                                 NOVA_CFG_IMAGE='cfg:local', RUN_DEPLOYMENT_CHECK='false')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.log.read_text()
+        self.assertIn('docker image save --platform linux/arm64 cfg:local', commands)
+        self.assertIn('images import --platform linux/arm64 -', commands)
+        self.assertLess(commands.index('images import'), commands.index('helm upgrade'))
 
     def test_credentials_use_stdin_and_do_not_skip_repo_registration(self):
         result = self.run_script('install-argocd.sh', KUBE_CONTEXT='test-cluster',

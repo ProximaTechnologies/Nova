@@ -167,6 +167,8 @@ ui:
     - name: NOVA_AGENT_INSECURE_TLS
       value: "true"
 dragonfly:
+  # Leave headroom inside the 4Gi container limit; chart default is 24gb.
+  maxmemory: 1gb
   storageClass: "standard"
   storage: "1Gi"
   replicas: 1

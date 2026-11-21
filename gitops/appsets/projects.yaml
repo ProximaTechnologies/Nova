@@ -8,8 +8,8 @@ metadata:
 spec:
   description: Nova dev environment applications
   sourceRepos:
-    - https://github.com/ProximaTechnologies/Nova.git
-    - https://github.com/ProximaTechnologies/NovaCharts
+    - "https://github.com/ProximaTechnologies/Nova.git"
+    - ghcr.io/proximatechnologies/novacharts
     - https://apache.github.io/apisix-helm-chart
     - https://bitnami.github.io/sealed-secrets
     - https://cloudnative-pg.github.io/charts
@@ -45,8 +45,8 @@ metadata:
 spec:
   description: Nova stage environment applications
   sourceRepos:
-    - https://github.com/ProximaTechnologies/Nova.git
-    - https://github.com/ProximaTechnologies/NovaCharts
+    - "https://github.com/ProximaTechnologies/Nova.git"
+    - ghcr.io/proximatechnologies/novacharts
     - https://apache.github.io/apisix-helm-chart
     - https://bitnami.github.io/sealed-secrets
     - https://cloudnative-pg.github.io/charts
@@ -82,8 +82,8 @@ metadata:
 spec:
   description: Nova prod environment applications
   sourceRepos:
-    - https://github.com/ProximaTechnologies/Nova.git
-    - https://github.com/ProximaTechnologies/NovaCharts
+    - "https://github.com/ProximaTechnologies/Nova.git"
+    - ghcr.io/proximatechnologies/novacharts
     - https://apache.github.io/apisix-helm-chart
     - https://bitnami.github.io/sealed-secrets
     - https://cloudnative-pg.github.io/charts
