@@ -167,18 +167,18 @@ ui:
     - name: NOVA_AGENT_INSECURE_TLS
       value: "true"
 dragonfly:
-  # Leave headroom inside the 4Gi container limit; chart default is 24gb.
-  maxmemory: 1gb
+  # Fit the single-node development cluster; leave headroom for snapshots.
+  maxmemory: 512mb
   storageClass: "standard"
   storage: "1Gi"
   replicas: 1
   resources:
     requests:
-      cpu: "1"
-      memory: "2Gi"
+      cpu: "100m"
+      memory: "512Mi"
     limits:
-      cpu: "2"
-      memory: "4Gi"
+      cpu: "1"
+      memory: "1Gi"
   auth:
     enabled: false
   tls:
