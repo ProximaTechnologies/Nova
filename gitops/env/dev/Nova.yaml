@@ -4,6 +4,9 @@ ingress:
 
 cfg:
   image:
+    registry: ghcr.io
+    image: proximatechnologies/novacfg
+    tag: bootstrap-test
     imagePullPolicy: IfNotPresent
   env:
     - name: REDIS_URL
@@ -29,6 +32,9 @@ postgres:
 
 ui:
   image:
+    registry: ghcr.io
+    image: proximatechnologies/novaui
+    tag: bootstrap-test
     imagePullPolicy: IfNotPresent
   env:
     - name: DJANGO_SETTINGS_MODULE
