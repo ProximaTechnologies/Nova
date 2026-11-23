@@ -19,8 +19,10 @@ class. Existing clusters need a suitable storage class and ingress configuration
    contains local development passwords, `*.domain.com` hostnames, self-signed
    TLS, and disabled TLS verification. Configure secrets, DNS, TLS, image access,
    storage and resource limits for your deployment before exposing it. Nova's
-   chart is still sourced from `https://github.com/ProximaTechnologies/NovaCharts`;
-   that repository and its configured images must be accessible to the cluster.
+   chart is sourced from `oci://ghcr.io/proximatechnologies/novacharts/nova`,
+   pinned to version `0.1.0`. The GHCR package and configured container images
+   must be accessible to the cluster. Public GitHub repository visibility does
+   not by itself grant anonymous access to a GHCR package.
 3. Validate and commit/push the configuration to the configured repository and branch:
 
    ```sh
@@ -106,7 +108,33 @@ CD, and waits for application health. Add the demo hostnames to your host DNS or
 hosts file at `127.0.0.1` to use the mapped ingress ports. CoreDNS rewrites only
 affect pods. Set `RUN_DEPLOYMENT_CHECK=false` to skip the application health wait.
 Optional `NOVA_CFG_IMAGE` and `NOVA_UI_IMAGE` load already-built local Docker
-images into kind; the image references must match your Nova chart values.
+images into kind before Argo CD creates the workloads; the image references must
+match your Nova chart values. The loader exports only the node architecture to
+handle Docker caches with incomplete multi-platform indexes. It requires a
+Docker CLI supporting `docker image save --platform`. To load additional cached
+images into an existing kind cluster:
+
+```sh
+gitops/argo-cfg/load-kind-images.sh argo IMAGE[:TAG] [IMAGE[:TAG] ...]
+```
+
+Before application images are released, build them from this checkout and use
+local images for kind. The development values name the GHCR repositories used
+by this repository's image workflows; building a tag locally does not publish it.
+
+```sh
+IMAGE_TAG=ghcr.io/proximatechnologies/novaui:latest \
+  NovaUI/scripts/build-image-with-supervisor.sh
+docker build -t ghcr.io/proximatechnologies/novacfg:latest NovaCFG/main
+NOVA_UI_IMAGE=ghcr.io/proximatechnologies/novaui:latest \
+NOVA_CFG_IMAGE=ghcr.io/proximatechnologies/novacfg:latest \
+  gitops/argo-cfg/create-kind.sh argo
+```
+
+For an existing cluster, load those tags with `load-kind-images.sh` instead.
+The `NOVA_UI_IMAGE` and `NOVA_CFG_IMAGE` settings control which images are loaded;
+they do not rewrite Helm values. Custom tags must also be set in the target
+repository's `gitops/env/dev/Nova.yaml` before publishing.
 
 For an existing kind cluster, install without recreating it:
 
@@ -130,8 +158,7 @@ requires the Argo CD namespace and Helm release to both be `argocd`.
 Private Git repositories can use `ARGOCD_REPO_PASSWORD` or `GITHUB_TOKEN` and
 optional `ARGOCD_REPO_USERNAME`. Credentials are sent to a Kubernetes Secret,
 not written into the repository. `ARGOCD_REPO_CREDS_URL` defaults to the Nova
-repository URL; set it to your organization URL if the same token must also read
-private NovaCharts. SSH repositories require separately configured Argo CD SSH
+repository URL. These Git credentials do not configure Helm OCI registry access. SSH repositories require separately configured Argo CD SSH
 credentials. An absent token leaves existing credentials unchanged.
 
 `ARGOCD_HELM_VALUES` selects a custom Argo CD values file.
@@ -164,3 +191,49 @@ Before enabling stage or prod, supply real secrets and a complete runtime overla
 register distinct target clusters, and update the matching AppProject destinations
 and ApplicationSet generators. Do not alias multiple environments to the same
 cluster: the imported services share namespace and resource names.
+
+## Live verification, 2026-11-21
+
+Verified on a dedicated ARM64 kind cluster with Kubernetes v1.37.0 and Argo CD
+chart 9.5.15. The deployment health check passed for all 14 Applications,
+including the root and Forgejo-generated runtime repository. Nova returned its
+login redirect over the HTTPS ingress; Grafana reported a healthy database;
+Loki and Mimir readiness endpoints returned HTTP 200.
+
+The run exercised external-repository preparation and publishing against a
+local bare Git repository. Argo CD read a test-only Git mirror on the Docker
+network, including NovaCharts revision
+`0162a4c7b5c34c757b82ae3551bbd5f607dd657b`. This avoided putting the user's SSH
+credentials in the cluster. Anonymous HTTPS access to NovaCharts failed, so a
+that historical run used the mirror. Bootstrap now targets the versioned GHCR
+OCI chart instead of the Git chart source.
+The default repository URLs in this checkout were not changed for the test.
+
+Cached platform and application images were imported into kind. The uncached
+MinIO pull returned HTTP 401 from Quay during this run; cached images allowed
+functional verification to finish. This verifies application reconciliation and
+startup, but does not establish that every image is anonymously downloadable
+from a clean machine. Ensure the configured registries are accessible.
+
+## Public OCI verification, 2026-11-23
+
+Retested with the public OCI chart `nova:0.1.0` (digest
+`sha256:d3185a153c0750dbe58471acc047e617c17838c051ea8a4c5b78dacc67e3cba8`).
+Argo CD read configuration directly from the public Nova repository's isolated
+`codex/oci-bootstrap-test-20261121` branch; no local Git mirror was used.
+
+NovaUI and NovaCFG images had not been released, so this run built both from
+this checkout and loaded the `bootstrap-test` tags into kind. The test branch
+uses those tags; the development defaults in this checkout use the `latest`
+tags targeted by the image publishing workflows. These defaults require either
+local builds loaded into kind or published, accessible GHCR images.
+
+All 14 Applications reached `Synced`, `Healthy`, and `Succeeded`. Nova's
+`/healthz/` returned HTTP 200 and Grafana reported its database healthy. Reducing
+the development Dragonfly request to 512Mi allowed all three database instances
+to schedule on the single-node test cluster.
+
+MinIO's configured images still failed anonymous downloads, including a retry
+without Docker credentials. The existing local MinIO images were loaded to
+complete the functional test. An entirely uncached installation still requires
+an accessible MinIO image source (or a separately configured S3 backend).

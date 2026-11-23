@@ -15,8 +15,8 @@ verification, and reset commands.
 - `tests/`: bootstrap regression tests using fake CLIs.
 
 All monorepo sources resolve paths from the repository root (`gitops/...`).
-External Helm charts retain the versions provided by the archive. NovaCharts
-remains an external dependency. Forgejo's generated runtime repository remains
+Nova uses the published OCI chart `ghcr.io/proximatechnologies/novacharts/nova`
+at version `0.1.0`. Other external Helm charts retain the archive versions. Forgejo's generated runtime repository remains
 separate from this source repository.
 
 External repository example (requires Git and the validation Python dependencies):

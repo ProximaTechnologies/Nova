@@ -38,12 +38,11 @@ helm upgrade --install "$HELM_RELEASE" argo/argo-cd \
   --version "$HELM_CHART_VERSION" --values "$VALUES_FILE" --wait \
   --timeout "${ARGOCD_HELM_TIMEOUT:-10m}"
 
-# Register both the monorepo and the separately maintained Nova chart source.
+# Register the Git configuration repository and the Nova Helm OCI repository.
 "${KUBECTL[@]}" apply -f "$SCRIPT_DIR/repository.yaml"
 if [[ -n "$REPO_PASSWORD" ]]; then
   b64() { printf '%s' "$1" | base64 | tr -d '\n'; }
-  # Default to this repository only. Set an organization URL explicitly if a
-  # private NovaCharts repository must share the same credential template.
+  # These credentials apply to Git only; the published OCI chart is public.
   repo_url="${ARGOCD_REPO_CREDS_URL:-$(awk '/    repoURL:/ {print $2; exit}' "$SCRIPT_DIR/root-app.yaml")}"
   # Generated manifests quote the URL as a JSON-compatible YAML scalar.
   if [[ "$repo_url" == \"* ]]; then

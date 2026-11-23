@@ -87,19 +87,28 @@ configure_demo_dns() {
   rm -f "$corefile" "$updated_corefile"
 }
 
-for command in kind kubectl helm; do
+for command in kind kubectl helm docker; do
   command -v "$command" >/dev/null || { echo "Missing command: $command" >&2; exit 127; }
 done
 [[ -f "$KIND_CONFIG" ]] || { echo "Missing kind config: $KIND_CONFIG" >&2; exit 2; }
-if kind get clusters | grep -Fxq -- "$CLUSTER_NAME"; then
+# Fail before creating a cluster if Docker is unavailable or an optional local
+# image is missing. Do not mistake a failed cluster listing for an empty list.
+docker info >/dev/null
+for image in "$NOVA_CFG_IMAGE" "$NOVA_UI_IMAGE"; do
+  if [[ -n "$image" ]]; then docker image inspect "$image" >/dev/null; fi
+done
+clusters="$(kind get clusters)"
+if printf '%s\n' "$clusters" | grep -Fxq -- "$CLUSTER_NAME"; then
   echo "Cluster '$CLUSTER_NAME' already exists. Use install-argocd-kind.sh or reset.sh --force." >&2
   exit 2
 fi
 kind create cluster --name "$CLUSTER_NAME" --config "$KIND_CONFIG"
+# Make local workloads available before Argo CD starts creating their pods.
+for image in "$NOVA_CFG_IMAGE" "$NOVA_UI_IMAGE"; do
+  if [[ -n "$image" ]]; then "$SCRIPT_DIR/load-kind-images.sh" "$CLUSTER_NAME" "$image"; fi
+done
 configure_demo_dns
 "$SCRIPT_DIR/install-argocd-kind.sh" "$CLUSTER_NAME"
-if [[ -n "$NOVA_CFG_IMAGE" ]]; then kind load docker-image "$NOVA_CFG_IMAGE" --name "$CLUSTER_NAME"; fi
-if [[ -n "$NOVA_UI_IMAGE" ]]; then kind load docker-image "$NOVA_UI_IMAGE" --name "$CLUSTER_NAME"; fi
 
 if [[ "$RUN_DEPLOYMENT_CHECK" == "true" ]]; then
   "$SCRIPT_DIR/../scripts/test-deployments.sh" \

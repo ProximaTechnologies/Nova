@@ -21,5 +21,6 @@ metadata:
 type: Opaque
 stringData:
   name: NovaCharts
-  type: git
-  url: https://github.com/ProximaTechnologies/NovaCharts
+  type: helm
+  enableOCI: "true"
+  url: ghcr.io/proximatechnologies/novacharts

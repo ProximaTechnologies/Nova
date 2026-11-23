@@ -24,8 +24,9 @@ spec:
     spec:
       project: "{{project}}"
       sources:
-        - repoURL: https://github.com/ProximaTechnologies/NovaCharts
-          path: Nova
+        - repoURL: ghcr.io/proximatechnologies/novacharts
+          chart: nova
+          targetRevision: 0.1.0
           helm:
             releaseName: nova
             valueFiles:

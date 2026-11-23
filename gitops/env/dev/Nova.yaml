@@ -4,6 +4,9 @@ ingress:
 
 cfg:
   image:
+    registry: ghcr.io
+    image: proximatechnologies/novacfg
+    tag: latest
     imagePullPolicy: IfNotPresent
   env:
     - name: REDIS_URL
@@ -29,6 +32,9 @@ postgres:
 
 ui:
   image:
+    registry: ghcr.io
+    image: proximatechnologies/novaui
+    tag: latest
     imagePullPolicy: IfNotPresent
   env:
     - name: DJANGO_SETTINGS_MODULE
@@ -167,16 +173,18 @@ ui:
     - name: NOVA_AGENT_INSECURE_TLS
       value: "true"
 dragonfly:
+  # Fit the single-node development cluster; leave headroom for snapshots.
+  maxmemory: 512mb
   storageClass: "standard"
   storage: "1Gi"
   replicas: 1
   resources:
     requests:
-      cpu: "1"
-      memory: "2Gi"
+      cpu: "100m"
+      memory: "512Mi"
     limits:
-      cpu: "2"
-      memory: "4Gi"
+      cpu: "1"
+      memory: "1Gi"
   auth:
     enabled: false
   tls:
